@@ -4,250 +4,320 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project is
 
-LumiGuide is a luminescence (OSL/TL) dating workflow assistant. It visualizes the
-analysis pipeline and helps researchers pick a statistical age model (CAM / MAM / FMM)
-based on the equivalent-dose (De) distribution. The statistical heavy lifting is done by
-the R `Luminescence` package, called from Python via `rpy2` — the project deliberately
-does **not** reimplement those statistics.
+LumiGuide is a luminescence (OSL/TL) dating workflow assistant. It visualizes the analysis
+pipeline and helps researchers pick a statistical age model (CAM / MAM / FMM, and related
+models) from the equivalent-dose (De) distribution.
+The statistics are done by the R `Luminescence` package — the project deliberately does
+**not** reimplement them.
 
-This is the English-language version of the project (`project-Lumiguide_EN`); communication
-with the user and source comments are in English here. The original Korean-language
-repository is `project-Lumiguide`.
+This repository is the English mirror of the Korean one: same code and content, with source
+comments and messages in English. Communication with the user is in Korean.
 
-## Local-only documents
+## Direction reset (2026-09-22)
 
-This repository is public, so the planning and working documents are deliberately kept out
-of it (`.gitignore`). They exist in the working directory but not in git history:
+After a meeting with the domain researchers and the package review that followed, the
+project restarts on these decisions (made by the user):
 
-| File | What it is |
-|---|---|
-| `루미네선스 연대 해석을 위한 데이터 시각화 및 모델 추천 시스템 개발.pdf` | Development proposal — the product plan below is derived from it |
-| `멀티에이전트_계획.txt` | Internal planning: who builds what, when to parallelize |
-The dated working notes (`전체점검 및 수정(*).txt`, `이슈정리_업로드단계.txt`) were folded
-into these two documents on 2026-07-21 and deleted. Keeping one issue list per session meant
-re-diffing three files to learn what was still open; the surviving items now live in the
-planning doc's issue list, and the technical gotchas they recorded live below, next to the
-code they concern.
+1. **The Streamlit frontend is retired.** The whole ver.1.0 app was moved, unchanged, from
+   `app/` to `version1_streamlit/`. It still runs; read it for reference, do not extend it.
+2. **`Luminescence` is the reference implementation.** Other packages are added only for a
+   concrete gap, per the conditional-adoption table below — never speculatively.
+3. **Analysis first, but not strictly sequential.** `R/Analysis.R` (renamed from
+   `pipeline.R` on 2026-09-22) carries the priority, since nearly all unresolved risk is
+   there. The order is:
+   0. Fix the contract (the three decisions under Open engineering decisions) and prove it
+      with the thinnest end-to-end slice on the real server.
+   1. Harden `Analysis.R` against that contract **in parallel with** a frontend prototype
+      built on mock data shaped by the same contract. Without step 0 the two sides would be
+      guessing the interface, which is exactly the integration cost that made parallel work
+      a loss before (`멀티에이전트_계획.txt` §5).
+   2. Integrate and confirm the requested features end to end.
+4. **The end product is a web application** hosted on a server the user provides. Server
+   details are still to come — do not assume a stack, OS, or deployment model.
 
-References to these files elsewhere in this document point at local copies. If they are
-missing, ask the user rather than assuming the information is unavailable — do not commit
-them, and do not treat their absence as license to skip reading them.
+Decision 4 is consistent with the old plan, not a reversal: `멀티에이전트_계획.txt` §3 said
+to revisit a backend layer when (a) several researchers need concurrent access, (b) the
+analysis server and the screen are physically separate, or (c) the frontend moves off
+Streamlit. All three now hold.
 
-## Product plan (from the development-proposal PDF)
+## Private context and sources
 
-Source of truth: `루미네선스 연대 해석을 위한 데이터 시각화 및 모델 추천 시스템 개발.pdf`
-(local-only — see above).
-Background: R analysis packages (Luminescence, numOSL, RLumShiny, DRAC — Kreutzer et al.
-2012, Philippe et al. 2019) have advanced OSL/TL analysis, but interpreting the De
-distribution and choosing a statistical model still relies on researcher judgment, and the
-workflow is scattered across tools. LumiGuide's aim is to reduce that uncertainty by
-standardizing + visualizing the workflow and adding AI-assisted model selection.
+The repository is public. Requested features, the requirement source, pending inputs from
+the researchers, and the list of local-only documents live in **`CLAUDE.local.md`**
+(gitignored, loaded automatically). If it is missing, ask the user. **Never copy its
+contents** — links, institution names, meeting-derived requirements or figures — into this
+file, `README.md`, code comments, or commit messages.
 
-Four required capabilities:
-1. **Data visualization** — decay curves, dose–response curves, De distribution & radial
-   plots, quality metrics (recycling ratio, recuperation), and model-comparison graphs.
-2. **De-distribution-based model recommendation** — automatically analyze distribution
-   properties (overdispersion, skewness, multimodality) to recommend the appropriate
-   statistical age model: CAM (Central Age Model), MAM (Minimum Age Model), or FMM
-   (Finite Mixture Model).
-3. **Workflow visualization** — surface the full analysis pipeline end to end:
-   raw data → signal analysis → De distribution analysis → AI model recommendation →
-   apply statistical model → age calculation → result visualization & report generation.
-4. **Researcher interface** — let a researcher upload data and read results intuitively.
+- **Never open a Notion page titled "회의록", nor the local folder `회의록&자료/회의록/`.**
+  Both contain personal information. This holds even when they look relevant; ask the user
+  instead.
+- Local-only documents (`회의록&자료/`, `멀티에이전트_계획.txt`) are gitignored — never
+  commit them. Keep one issue list (the planning doc); do not start dated note files.
 
-This target pipeline is what the `SESSION_SCHEMA` stages in `state_manager.py` and the
-`app/main.py` tabs are meant to grow into; today it reaches as far as SAR (see Current
-status). Capability (2)'s recommendation logic is exactly the still-open "LLM vs
-rule-based" decision noted below, and research reproducibility should weigh on it.
+The target data is **single-grain** (one grain per hole on a multi-hole disc, hundreds to
+thousands of grains per sample); both modes are handled by `run_sar_analysis(mode=)`. "Single aliquot" in
+the requirements means a *multi-grain* aliquot: one De per disc. SAR is the protocol for
+both.
 
-**Planned LLM component: RAG over the luminescence literature.** The current direction —
-not yet finalized, pending a meeting with the domain practitioner — is to OCR luminescence
-papers and technical documents into a corpus, then have an LLM answer questions against
-that corpus to assist the researcher's model choice. Whether the interaction is a free-form
-prompt the researcher types, or something more structured (e.g. the LLM narrating why the
-distribution's stats point to a given model, with citations back to the corpus), is exactly
-what the upcoming meeting is expected to settle — do not assume a chat-prompt UI ahead of
-that. This is assistive, not decisional: it does not change the reproducibility argument
-below, which is about what actually *selects* CAM/MAM/FMM. A RAG-backed explanation layer
-can sit on top of a deterministic rule engine without compromising it — the rules pick the
-model, the LLM explains the pick and lets the researcher interrogate the literature behind
-it. Treat this as the shape of "LLM-based" in the open decision below, not a competing
-third option.
+## Package review conclusions
+
+From `루미네선스_분석패키지_검토.html` (Luminescence 1.2.1 installed; CRAN latest 1.3.1).
+
+- **Luminescence covers nearly every requested feature.** It ships 10 De-distribution
+  models (`calc_CentralDose`, `calc_MinDose`, `calc_FiniteMixture`, `calc_CommonDose`,
+  `calc_MaxDose`, `calc_AverageDose`, `calc_IEU`, `calc_FuchsLang2001`,
+  `calc_WodaFuchs2008`, `calc_EED_Model`), 2 fading corrections, 3 distribution
+  diagnostics, single-grain helpers (`subset_SingleGrainData`, `verify_SingleGrainData`,
+  `convert_SG2MG`, `plot_SingleGrainDisc`), and all dashboard plots. `convert_SG2MG`
+  **sums the signals** of all grains on a disc into one synthetic aliquot (then SAR gives
+  one De per disc); it does not average grain De values.
+- **Package choice does not decide accuracy.** The same estimator (e.g. Galbraith 1999
+  CAM) gives the same answer in any package. Accuracy is decided by three researcher
+  judgments — integral choice (~15% De shift), which grains are kept, and which model
+  is applied. Each added package adds a fourth: "which package was used".
+- **Conditional adoption** (add only when the condition actually occurs):
+
+  | Condition | Add | Plugs in at (stage, see Code as it stands) |
+  |---|---|---|
+  | Model choice needs quantitative backing | numOSL `sensSAM` | between ④ and ⑤ — backs the rule pick, does not replace it |
+  | ML estimates insufficient for MAM/FMM uncertainty | numOSL `mcMAM`, `mcFMM` | ⑤, beside `calc_MinDose` / `calc_FiniteMixture` (comparison, not replacement) |
+  | Medium/slow component contamination found in real data | `OSLdecomposition` | between ② and ③: `RLum.OSL_global_fitting` → `RLum.OSL_decomposition` returns `RLum.Analysis` meant for `analyse_SAR.CWOSL`; replaces the channel-integral signal, so stamp it on results |
+  | DRAC's external transfer is not allowed | numOSL `calDA` (offline) | ⑥, instead of `use_DRAC()` |
+
+  The numOSL functions above take a two-column (De, error) matrix — `cbind(de, de_error)`;
+  `calDA` takes numeric inputs (U/Th/K, grain size, water content, depth, location). A
+  conversion layer is needed only if numOSL's own BIN pipeline were used, which is not
+  planned. Neither numOSL nor OSLdecomposition is installed yet.
+  **DRAC is a web service, not a package**: `use_DRAC()` sends sample data to Durham's
+  server — check the institution's data policy first. RLumShiny is a GUI layer (a design
+  reference for which parameters to expose), not an analysis supplement.
+- **CSV import is not supported by Luminescence** (`import_Data` reads BIN/BINX, XSYG,
+  Daybreak, PSL, RF, SPE, TIFF, HeliosOSL). A CSV of computed De values is trivial
+  (`read.csv` → any `calc_*`); a raw Risø CSV export needs a rebuild into `RLum.Analysis`.
+  Don't start either until the file type is known.
+
+Several pieces of work wait on inputs from the researchers (listed in `CLAUDE.local.md`) —
+notably the source dose rate, without which De stays in seconds. Do not guess them.
+
+## Open engineering decisions
+
+Decide these before hardening `Analysis.R`'s public functions, since each one changes their
+signatures:
+
+- **Output contract — decided (2026-09-24): R returns plot *data*; the browser draws.** The
+  researchers find the plots of their current tools and of R hard to read, so the frontend
+  draws richer, colour-coded charts. `R/run.R` is the only interface:
+  `Rscript R/run.R input.json output.json`, input `{"action", "args"}`, output
+  `{"ok", "action", "result" | "error", "meta"}`, exit 0/1 (the file is written either way).
+  Actions: `inspect`, `curve`, `sar`, `dose_response`, `age_model`. JSON rules the browser
+  relies on: array fields stay arrays even with one element (`I()`), tables are arrays of row
+  objects, NA/NaN/Inf become `null`, numbers are not rounded. The PNG functions
+  (`save_rlum_record_plot`, `plot_dir`, radial/abanico `output_dir`) remain only for the
+  legacy Streamlit app — do not build on them.
+  - Chart data sources: `get_record_curve()` (②), `get_dose_response()` (③, same data and
+    seed as `run_sar_analysis()`, so De matches the table), `analyse_de_distribution()`'s
+    `radial_x/radial_y` (④, Galbraith radial coordinates around the CAM centre).
+  - The dose-response `curve_x/curve_y` evaluate Luminescence's `Formula`, whose
+    coefficients are rounded to 3 significant digits — display only (~0.03% off at De);
+    De itself comes from the unrounded fit.
+  - `inspect` returns every record row (~240 KB for 882 records). A full single-grain file
+    (~86,000 records) would be ~24 MB — paginate or filter before that reaches a browser.
+- **R bridge — decided (2026-09-24): PHP calls `Rscript` per request (approach A).** The
+  server runs nginx + Apache + PHP; SSH is the admin channel only, not the request path.
+  Request flow: browser → nginx → Apache → PHP → `Rscript R/run.R` → `R/Analysis.R`.
+  No Python backend is planned, so `r_runner.py` does not survive into the web build.
+  `model_recommend.py`'s rules move to R, so selection is reproducible in one place.
+  Consequences:
+  - Each request is a fresh R process, so the in-memory `.bin_cache` only helps within one
+    request. Cache the parsed `Risoe.BINfileData` to disk (`saveRDS`/`readRDS`, keyed like
+    `.bin_cache`) and reuse stage outputs from the sample folder, invalidated by
+    dependency as in `state_manager.py`. Move to a resident R process (`plumber`) only if
+    measured load times demand it.
+  - Pass user input to R with `escapeshellarg()` or a JSON file, never interpolated into
+    a shell string.
+  - Measure on the server: BIN parse vs `readRDS` time, and full single-grain SAR runtime.
+    If SAR exceeds PHP's execution limit, run it as a background job with progress.
+- **Execution model.** SAR runs serially per unit (POSITION, or POSITION + GRAIN);
+  `run_sar_analysis(progress_file=)` rewrites `{"done", "total"}` JSON atomically after each
+  unit, for the web layer's progress bar. At single-grain scale (thousands of
+  grains) the runtime is unmeasured on the server; if it is minutes, the web layer needs
+  background jobs with progress. Local trial: ~0.04–0.06 s per grain SAR, so ~4,800 grains
+  ≈ 3–5 min serial — above PHP's default 30 s limit.
+- **Frontend stack.** PHP renders pages (HTML/CSS/JS in the browser); the JS/UI approach
+  beyond that is open. Decided: no separate SAR screen —
+  SAR exists to feed the De distribution, so its results (De, QC verdicts) are shown within
+  the distribution view.
+- **LLM layer.** RAG over an OCR'd luminescence-literature corpus that *explains* the
+  rule-picked model with citations. Its interaction shape (free prompt vs structured
+  narration) is not decided — do not assume a chat UI.
 
 ## Commands
 
-All commands assume the repo root and the project's own virtualenv (Python 3.14):
+The project virtualenv (Python 3.14) is still used for the legacy code and the self-checks:
 
 ```bash
-source venv/bin/activate          # activate the venv first
-streamlit run app/main.py         # run the main app (primary entry point)
-pip install -r requirements.txt   # install/refresh dependencies
+Rscript R/selfcheck.R                                       # analysis-layer self-check (~15 s)
+source venv/bin/activate
+venv/bin/python version1_streamlit/utils/r_runner.py        # legacy self-check (~2 s)
+venv/bin/python version1_streamlit/utils/model_recommend.py
+venv/bin/python version1_streamlit/utils/file_utils.py
+venv/bin/python version1_streamlit/utils/state_manager.py   # Streamlit-specific
+streamlit run version1_streamlit/main.py                    # legacy ver.1.0 UI, reference only
 ```
 
-There is no test suite or linter configured. Each `app/utils/` module carries an
-`assert`-based self-check in its `__main__` block instead — run any of them directly
-(`venv/bin/python app/utils/state_manager.py`). `r_runner.py`'s generates its own R
-fixture, so it needs no committed data. `rpy2` requires a working R installation with
-the `Luminescence` package available on the system.
+There is no test suite or linter. `R/selfcheck.R` is the analysis layer's test and runs the
+way the web layer will (`Rscript`); it builds its fixture from the installed package, so it
+needs no committed data. `r_runner.py`'s self-check is legacy — keep it passing while the
+Streamlit app remains, but add new checks to `R/selfcheck.R`. `rpy2` needs a working R with
+`Luminescence` installed.
 
-## Architecture
-
-Three layers, bridged by `rpy2`. Data flows **UI → utils → R** and back:
+## Code as it stands
 
 ```
-app/main.py            Streamlit entry: page config, sidebar, 5 workflow tabs
-  └─ app/tabs/         one module per tab (upload / signal / sar implemented)
-       └─ app/utils/   the bridge + state layer
-            └─ R/pipeline.R   R functions run inside the Luminescence package
+R/Analysis.R                     entry point: library() + sources the stage files  ← the focus now
+R/01_load.R                      ① path → Risoe.BINfileData; file cache; .save_png helper
+R/02_signal.R                    ② POSITION → RLum.Analysis records, curve plots
+R/03_sar.R                       ③ RLum.Analysis + integrals → De table + QC
+R/04_distribution.R              ④ De table → OD, skewness, FMM BIC, radial/abanico
+R/05_models.R                    ⑤ De table → rule recommendation → CAM/MAM/FMM dose (run_age_model)
+                                 ⑥ dose rate & age: not written (dose rate pending)
+R/run.R                          web entry point: JSON in → action → JSON out (the PHP ↔ R contract)
+R/selfcheck.R                    analysis-layer self-check (Rscript), including run.R round trips
+version1_streamlit/              the ver.1.0 app, moved intact (imports are relative to it)
+  utils/r_runner.py              the only crossing point into R (rpy2)   ← not carried into the web build
+  utils/file_utils.py            sample_id + per-sample folder layout, CSV output
+  utils/model_recommend.py       the same rules in Python — legacy; the R copy in 05_models.R leads
+  main.py, tabs/, utils/state_manager.py   Streamlit UI
 ```
 
-The tab numbering in `main.py` must match the sidebar Workflow list — they drifted
-apart once already (De Distribution was missing, so Model Recommendation sat at 4).
+`r_runner.py` resolves `R/Analysis.R` as `parents[2]` of itself, so keep
+`version1_streamlit/` directly under the repo root or that path breaks. `Analysis.R` finds
+the stage files next to itself (innermost `source()` frame's `ofile`), so it must be loaded
+with `source()`.
 
-- **`app/utils/r_runner.py`** is the single crossing point into R. `pipeline.R` is
-  `source()`d exactly once (guarded by `_PIPELINE_LOADED` + `R_LOCK`), and every R call
-  is serialized under `R_LOCK` inside a `default_converter.context()`. rpy2 is not
-  thread-safe, so **all** R access must go through this locked pattern — do not call
-  `rpy2.robjects.r[...]` directly from tabs or elsewhere. R results are manually unpacked
-  from R vectors into plain Python dicts here (see `inspect_uploaded_file`).
+### `R/` analysis layer — things that bite
 
-  **Unpack R vectors through the `r_*_list` / `r_scalar_*` helpers, never with a bare
-  `int(x) if x is not None`.** rpy2 does not turn R's `NA` into `None`; it hands back a
-  per-type sentinel, so that guard is dead code that silently admits garbage — `NA_integer_`
-  arrives as `-2147483648`, `NA_character_` as the literal string `"NA_character_"`,
-  `NA_real_` as `nan`. Worse, `NACharacterType` subclasses `str`, so `isinstance` will not
-  catch it either; `is_r_na()` compares by `is` identity for exactly this reason. A record
-  table showing `-2147483648` for RUN/SET is this bug, not a data problem.
+It reads Risø `.bin` / `.rda` / `.rdata` into `Risoe.BINfileData` (`load_bin_data`,
+LRU-cached), summarizes positions/records, plots curves, runs SAR, and analyses the De
+distribution. Validation and error messages live in R and surface as exceptions.
 
-- **`R/pipeline.R`** holds the analysis functions. It reads Risø `.bin` / `.rda` /
-  `.rdata` files into a `Risoe.BINfileData` object (`load_bin_data`, LRU-cached by
-  path+mtime+size), summarizes positions/records (`inspect_positions`,
-  `inspect_rlum_records_by_position`), plots curves (`save_rlum_record_plot`), and runs
-  SAR (`run_sar_analysis`). Input validation and error messages live in R and surface
-  up to the Streamlit UI as exceptions. Several things bite here:
-  - **macOS quartz png writes the file only at `dev.off()`.** Close the device
-    explicitly right after drawing, then check `file.exists()`; leave `on.exit` only as
-    a leak guard. Getting this order wrong makes every plot silently fail.
-  - **`analyse_SAR.CWOSL()` takes vectors**, not the `signal.integral.min/max` form seen
-    in older docs: `signal_integral = c(1, 2)`, `background_integral = c(900, 1000)`.
-  - **Batch stages collect per-item failures instead of aborting.** `run_sar_analysis`
-    returns `failed_position` + `failed_reason` so one bad aliquot doesn't discard the
-    rest — a De distribution needs many aliquots, and a dropped one must say why.
-  - **`Risoe.BINfileData2RLum.Analysis()` returns a list *per GRAIN*, not per record.** In a
-    single-grain measurement (several GRAINs under one POSITION) `length(obj)` is the GRAIN
-    count, so the old `min(n_meta, length(obj))` truncation silently drew a whole-GRAIN curve
-    in place of the record the user picked. `.load_position_records()` now validates this in
-    one place — both the record listing and the plot path go through it — and `stop()`s
-    rather than guessing. Multi-GRAIN files are therefore *blocked*, not supported; see the
-    planning doc, since MAM/FMM target exactly that data.
-  - **The `.bin_cache` key is `path + mtime + size` only.** That is enough today because one
-    file yields one object. If an object picker is ever added (an `.rda` may hold several
-    `Risoe.BINfileData`), `object_name` **must** join the key, or switching objects will
-    return the cached previous one.
+- **macOS quartz png writes the file only at `dev.off()`.** `.save_png()` (`01_load.R`)
+  closes the device right after drawing, then checks `file.exists()`; `on.exit` is only a
+  leak guard. Save every PNG through it.
+- **`analyse_SAR.CWOSL()` takes the channels themselves**: `signal_integral = 1:2`,
+  `background_integral = 900:1000`. `c(900, 1000)` means channels 900 and 1000 only — the
+  code passed that form until 2026-09-24, so the background used 2 channels instead of 101
+  (Luminescence warned "please check your input"; example POSITION 1 De 1661.3 → 1668.3 s,
+  one more aliquot fails QC). `.parse_integral()` returns `c(start, end)` for stamping;
+  `.run_sar_one()` expands it with `seq()`.
+- **SAR warnings are captured per unit** into the result's `warning` column instead of
+  being lost on the console. A QC-passing grain can still carry one (e.g. a zero Lx/Tx
+  point, so the dose-response fit ignored its weights) — show it next to that grain.
+- **De comes out in seconds, not Gy.** Regeneration doses (`IRR_TIME`) are in seconds and no
+  `dose_rate_source` is passed. Passing the source dose rate (Gy/s) to
+  `analyse_SAR.CWOSL(dose_rate_source=)` converts De and the dose-response x-axis together.
+  Five `Gy` labels in the code (`sar_tab.py`, `de_tab.py`, `r_runner.py`, `04_distribution.R`) are
+  currently wrong.
+- **`Risoe.BINfileData2RLum.Analysis()` returns a list per GRAIN, not per record.** With
+  several GRAINs under one POSITION, `length(obj)` is the GRAIN count and record indices
+  point at grains. `.position_records(bin_data, pos, grain)` is the one place that loads
+  records: single-grain files need `grain`; a multi-GRAIN POSITION without it `stop()`s.
+  A file is single-grain when any `GRAIN > 0` (single-aliquot files record `GRAIN = 0`).
+- **Measurement modes.** `run_sar_analysis(mode = "single_grain")` runs SAR per
+  (POSITION, GRAIN); `"single_aliquot"` runs it per POSITION, first applying
+  `convert_SG2MG()` when the file is single-grain. Results carry `mode`, `grain`, and a
+  per-disc summary (`disc_n_units`, `disc_n_accepted`).
+- **SAR results are random unless seeded.** `analyse_SAR.CWOSL()` estimates De error by
+  Monte Carlo, and the "Palaeodose error" QC criterion uses it — unseeded, a borderline
+  grain flipped between pass and fail across seeds (up to 84% De-error change on dim
+  grains). `run_sar_analysis()` seeds each unit (`seed`, stamped on results), so a verdict
+  does not depend on which other units were selected.
+- **The `.bin_cache` key is `path + mtime + size` only.** If an object picker is added (an
+  `.rda` may hold several `Risoe.BINfileData`), `object_name` must join the key.
+- **Batch stages collect per-item failures instead of aborting.** `run_sar_analysis`
+  returns `failed_position` + `failed_reason`, so one bad aliquot doesn't discard the rest.
+- **Integral defaults are file-dependent.** `900:1000` assumes 1000 channels; read
+  `NPOINTS` instead. Single-grain laser files can start with laser-off channels (the local
+  test files: channels 1–5 are background, signal starts at 6), so a fixed early-channel
+  default integrates no signal and every grain fails QC.
 
-- **`app/utils/state_manager.py`** is the most non-obvious file. It models the pipeline as
-  **stages**, each with `input` (user/widget values), `output` (computed results), and
-  `depends_on` (the stages it directly reads), defined once in `SESSION_SCHEMA`. The core
-  rule: *when a stage's input changes, that stage's output and every stage that depends on
-  it — directly or transitively — are invalidated* (`invalidate_from`). **Dependency, not
-  schema order, is the criterion.** Changing the inspected POSITION clears that POSITION's
-  records and curve plot but leaves the SAR results standing, because `sar` does not depend
-  on `signal`. Adding a stage therefore means adding a `SESSION_SCHEMA` entry with its
-  `depends_on` — the invalidation logic never changes, and there are no hand-written
-  exception functions. The nested schema is flattened into `st.session_state` (flat keys are
-  safest for widget binding). Prefer the generic accessors
-  (`set_value`/`get_value`/`has_value`) and the stage wrappers over touching
-  `st.session_state` directly.
+### `r_runner.py` (while rpy2 is the bridge)
 
-  **Pipeline widgets must not carry `key=`.** Streamlit derives a keyless widget's identity
-  from its parameters, so a widget whose `value=` / `options=` come from pipeline state
-  resets by itself when that state is invalidated — which is why the integral inputs read
-  their default from `get_signal_params()`. Give such a widget a `key=` and it freezes:
-  it keeps showing the previous file's integral after a new upload has already cleared
-  `signal_params`. Moving the widget key *into* `SESSION_SCHEMA` is **not** the fix —
-  Streamlit raises if code writes a widget's key after that widget rendered, and
-  `signal_tab.py` renders the inputs before calling `set_signal_params()`. The self-check
-  scans `app/tabs/` for `key=` strings and asserts none collide with schema keys. Widgets
-  that hold a lookup value rather than pipeline state (`sar_detail_position` selects a
-  POSITION number, looked up against the current result) keep their key deliberately.
+`Analysis.R` is `source()`d once (`_ANALYSIS_LOADED` + `R_LOCK`); every R call runs under
+`R_LOCK` inside `default_converter.context()`. rpy2 is not thread-safe — never call
+`rpy2.robjects.r[...]` from elsewhere.
 
-- **`app/utils/file_utils.py`** handles upload and result persistence. Each upload gets a
-  sanitized, de-duplicated `sample_id` (`{name}_{YYYYMMDD}_{NN}`, reused when the content
-  hash matches) and a fixed folder layout under `outputs/samples/{sample_id}/`: `raw/`,
-  `inspect/`, `curve_plot/`, `analysis_results/`. **Analysis results must be written to
-  disk, not just held in session state** — that is a project requirement, not a nicety.
-  The uploaded file itself has to hit disk for a mechanical reason too: `st.file_uploader()`
-  yields a memory buffer rather than a file, rpy2 has no way to hand that buffer to R, and
-  every `pipeline.R` entry point takes a path. (Consequence: deleting a sample folder while
-  its `raw_path` still sits in session state raises `FileNotFoundError` — reset and re-upload.)
-  `save_sar_results()` writes the SAR CSVs; dose-response PNGs go to `curve_plot/`. It
-  deletes the previous run's CSVs before writing and stamps the signal/background integrals
-  onto every row, so a CSV on disk can never be a silent mix of two runs or a De whose
-  integral is unknown.
+**Unpack R vectors through the `r_*_list` / `r_scalar_*` helpers**, never a bare
+`int(x) if x is not None`: rpy2 returns per-type NA sentinels, not `None` — `NA_integer_`
+arrives as `-2147483648`, `NA_character_` as the string `"NA_character_"` (a `str`
+subclass, so `isinstance` won't catch it; `is_r_na()` compares by identity), `NA_real_` as
+`nan`.
 
-## Current status & direction
+### Legacy Streamlit layer
 
-Implemented: **upload**, **signal analysis**, **SAR analysis** (De values, QC
-classification, per-position dose-response plots, CSV output). Still placeholders: **De
-distribution** and **model recommendation**.
+The one idea worth carrying into the web build is `state_manager.py`'s invalidation rule:
+stages declare `depends_on`, and a changed input invalidates that stage and everything that
+depends on it **transitively — by dependency, not by order**. Everything else there
+(widget-key rules, `st.session_state` flattening) is Streamlit-specific.
 
-The standalone `app/prototypes/` apps were deleted — they duplicated the upload and signal
-tabs and had drifted (one kept its own `session_state` keys, bypassing `state_manager`
-entirely). The self-checks now serve the purpose the prototypes used to: isolating whether
-a fault is in the UI or in `utils`/R. Three things are unused on purpose and should not be
-re-flagged as dead code: `file_utils.list_samples` (the planned Research Workspace restore),
-`clear_bin_cache` in `pipeline.R` (manual use from the R console), and the thin per-key
-wrappers in `state_manager.py` (the documented call-site vocabulary).
+## Design principles (carry into the new build)
 
-`requirements.txt` deliberately lists only what the code imports (`pandas`, `rpy2`,
-`streamlit`). The FastAPI / LLM dependencies it used to carry were removed because no such
-code exists yet; re-add them when that layer is actually written, not before. One decision is
-explicitly still open (see `멀티에이전트_계획.txt`): whether model recommendation is
-LLM-based or rule-based. The original plan's other open item — an API contract / data schema
-— was retired: it assumed a FastAPI boundary that was never built and has no current
-justification for a single-user local tool. The stage contract lives in `SESSION_SCHEMA` and
-the R return values instead, deliberately next to the code so it cannot go stale separately.
-Read that planning doc before large structural changes; it also records why the
-analysis/backend/frontend agent split was dropped in favour of a design → implement → verify
-pipeline.
+- **Reproducibility decides model selection.** Same input → same model, or the age is not
+  publishable. Rules select CAM/MAM/FMM; the LLM (RAG) only explains the pick with
+  literature citations and may offer a second opinion near a rule's boundary. A design where
+  the LLM itself chooses reopens this and needs its own justification.
+- **Classify, don't silently filter.** SAR marks aliquots accepted/rejected (all six
+  `rejection.criteria` rows per POSITION) and keeps both. Narrowing the grains to a final
+  subset fits this: keep every grain with its verdict, present the accepted list
+  separately. An automatic drop is a judgment that changes the result and leaves no record.
+- **Stamp the judgment parameters onto results.** Integrals are written onto every SAR row
+  because they shift De ~15% and are not in the data file. Anything else that changes the
+  result (dose rate, sigmab, model thresholds) follows the same rule. So do the **name and
+  version of every analysis package** that produced a result — Luminescence included, not
+  only supplements (installed 1.2.1 vs CRAN 1.3.1 can differ). Store them in the result
+  file itself, and show them in the frontend below the result they belong to.
+- **Results are written to disk**, not only held in memory (project requirement).
+  `file_utils.py` defines `outputs/samples/{sample_id}/{raw,inspect,curve_plot,analysis_results}/`;
+  a new SAR run deletes the previous CSVs first, so a file never mixes two runs.
+- **Measurement data is never committed** (`*.bin`, `*.rda`, … in `.gitignore`).
 
-On the LLM-vs-rule question, note that reproducibility is the constraint that decides it:
-CAM/MAM/FMM selection criteria are established in the literature, and the same input must
-yield the same model for the result to be publishable. The planned RAG component (see
-Product plan above) does not relax this constraint — it is scoped as an explanation/lookup
-layer over the literature corpus, sitting alongside or on top of a deterministic rule
-engine, not a replacement for it. If a future design has the LLM itself choose the model,
-that reopens this constraint and needs its own justification; nothing decided so far
-implies that. The same logic applies upstream —
-signal/background integral choice shifts De by ~15% and is not recorded in the data file,
-which is why `signal_params` is carried into the SAR results rather than left implicit.
+## Current state
 
-The same principle governs quality control, and it is a design rule rather than an
-oversight: **SAR classifies aliquots, it does not filter them.** `RC.Status == "FAILED"`
-splits accepted from rejected and both are kept and written out, with all six
-`rejection.criteria` rows per POSITION rather than a selected few. Dropping an aliquot
-automatically would insert one more judgement that changes the result while leaving no
-record of itself — the exact problem this project exists to reduce. Whether the De
-distribution stage should keep that stance is still open (see the planning doc).
+Implemented in ver.1.0 (Streamlit): upload, signal analysis, SAR (De, QC classification,
+dose-response plots, CSV), De distribution (OD, skewness, FMM BIC, radial/abanico) with
+rule-based recommendation in `model_recommend.py`.
 
-Verification baseline, useful for spotting drift: the Luminescence package's own
-`ExampleData.BINfileData` (`CWOSL.SAR.Data`) has 24 POSITIONs; a clean SAR run yields 24/24
-analysed, 22 passing QC (POSITION 8 and 11 fail), De spanning 684–1905 Gy with a coefficient
-of variation around 17%. `r_runner.py`'s self-check asserts per-POSITION De ranges from this
-baseline — `_write_fixture()` regenerates it from the installed package, so the baseline
-needs no committed data file and cannot drift out of sync with a stale copy. Local test
-inputs (`test_data/`, including hand-made multi-GRAIN and subset `.bin` files) are
-gitignored; they are for manual upload testing, not for the self-check.
+Known defects to resolve in the analysis-first phase:
 
-Open issues carried between sessions live in one place: the issue list in
-`멀티에이전트_계획.txt` (local-only, not in git). Check it before picking up work, and keep
-it as the single list — do not start a new dated note file.
+- **Single-grain QC uses Luminescence's default rejection criteria** — the researchers'
+  selection criteria are pending.
+- **De unit** is seconds (above) — needs the dose rate.
+- **Stage ⑤ is a first draft for researcher review.** `run_age_model()` picks the model by
+  rule (or takes the user's, recorded as `model_source`) and applies it. FMM returns every
+  component and does not pick one — which component dates the event is a depositional
+  judgment. sigmab is an explicit input: 0.20 for single grains is literature-backed
+  (well-bleached single-grain quartz OD ~20%, Arnold & Roberts 2009); 0.15 for aliquots is
+  the legacy default and unconfirmed.
+- **No minimum sample size gates the recommendation.** With the local files, 3–4 accepted
+  De reach ⑤ and get a CAM dose; that is computable but statistically weak. Only the
+  mathematical floors are enforced (De > model parameters; FMM with k components needs 2k
+  De). A threshold must come from the researchers, not be guessed.
+- **Recommendation gate order is wrong for multimodal data.** The positive-skew (MAM) gate
+  runs before the multimodality (FMM) gate, and skewness is computed on raw De, where a
+  lognormal is always right-skewed — so genuine 2–3 component mixtures are classified MAM.
+  Do not reorder without expert review (it changes published ages); until then, do not
+  trust MAM/FMM separation on multimodal data. Negative/zero De stops explicitly (the
+  unlogged path is not implemented).
+- **Scale is untested**: 24 POSITIONs today vs thousands of grains.
 
-Two of those items constrain what can be built next, so they are worth knowing here:
-multi-GRAIN (single-grain) files are currently blocked rather than supported, and they are
-precisely what MAM/FMM are for; and whether the De distribution stage keeps or drops
-QC-rejected aliquots is undecided, which shapes that stage's schema.
-
-When adding a workflow stage, follow the existing pattern: add its schema entry in
-`state_manager.py`, add R functions in `pipeline.R`, expose them through `r_runner.py`'s
-locked pattern, and render a tab module under `app/tabs/`.
+**Verification baseline** (for spotting drift): `ExampleData.BINfileData`
+(`CWOSL.SAR.Data`) has 24 POSITIONs; a clean SAR run (`1:2` / `900:1000`, seed 1) gives
+24/24 analysed, 21 passing QC (POSITIONs 8, 11, 22 fail; 22 on recycling ratio 1.114 > 1.1),
+De 673.1–1883.3 **s** (seconds — see the unit note), CV ~17%; the 21 accepted give OD 18.9%
+→ CAM 1391.9 ± 58.4 s. `ExampleData.DeValues`: CA1 → FMM (k = 3, ΔBIC 95.5), BT998 → CAM
+2936 s. `R/selfcheck.R` asserts all of this. Local test inputs (`test_data/`) are gitignored
+and never committed: hand-made multi-GRAIN and subset `.bin` files, plus two real
+single-grain files (`bin.BIN`, `bin2.BIN`: 49 grains each, laser off in channels 1–5). With
+integrals `6:10` / `81:100` and seed 1, single-grain mode passes 4 and 3 grains;
+single-aliquot mode passes discs 1, 7, 8 and 5, 7, 8. `R/selfcheck.R` asserts these when
+the files exist.

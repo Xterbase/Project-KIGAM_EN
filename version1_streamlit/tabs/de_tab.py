@@ -1,4 +1,4 @@
-# app/tabs/de_tab.py
+# version1_streamlit/tabs/de_tab.py
 
 from pathlib import Path
 

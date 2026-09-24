@@ -1,112 +1,116 @@
 # LumiGuide
 
-A workflow assistant for luminescence (OSL/TL) dating interpretation.
+A workflow assistant for luminescence (OSL/TL) dating.
 
-It visualizes the analysis pipeline and helps researchers pick a statistical age model
-(CAM / MAM / FMM) based on the characteristics of the equivalent-dose (De) distribution
-(overdispersion, skewness, multimodality). The statistical heavy lifting is done by the R
-`Luminescence` package — this project does not reimplement those statistics, it calls R
-via `rpy2`.
+It brings the analysis from raw measurement data to age calculation together in one place,
+visualizes it, and helps choose a statistical age model (CAM / MAM / FMM, etc.) based on the
+characteristics of the equivalent dose (De) distribution (overdispersion, skewness,
+multimodality). The statistics are handled by the R
+[`Luminescence`](https://cran.r-project.org/package=Luminescence) package; this project does not
+reimplement them.
 
-## What it does
+## Current stage
 
-It provides a step-by-step, tab-based workflow that goes from raw data → signal analysis
-→ De distribution analysis → model recommendation → (planned) age calculation → results
-and report. The goal is to reduce the uncertainty researchers face when judging "which
-model to use given this De distribution" through a standardized, visualized workflow and
-evidence-based recommendations.
+**Being rebuilt as a web application.** The first version built with Streamlit (ver.1.0) is kept
+for reference in `version1_streamlit/`; the analysis layer (`R/`) is hardened first and then
+moved into a server-based web application. The web structure is browser → PHP →
+`Rscript R/run.R` → analysis layer, and R hands over charts as data (JSON), not images, for the
+browser to draw.
 
-**The model recommendation is deterministic.** The same input plus the same thresholds
-always produce the same model — because a published age value has to be reproducible.
-The recommendation does not replace the researcher's judgment; it's a guide that presents
-supporting metrics alongside the suggestion.
+```
+raw data → signal analysis → De distribution analysis → model recommendation → age model → age calculation → results/report
+```
 
-## Current status
-
-| Stage | Tab | Status |
+| Component | Location | Status |
 |---|---|---|
-| 1 | Data Upload & Inspect | Implemented |
-| 2 | Signal Analysis | Implemented |
-| 3 | SAR Analysis | Implemented (De values, QC classification, growth curves, CSV) |
-| 4 | De Distribution | Implemented (distribution metrics + CAM/MAM/FMM recommendation) |
-| 5 | Model Recommendation | Placeholder — the recommendation logic currently lives inside Tab 4 |
+| ① Load | `R/01_load.R` | Reads BIN/RDA, detects single-grain vs single-aliquot automatically |
+| ② Signal | `R/02_signal.R` | Records per POSITION (+GRAIN), signal curve data |
+| ③ SAR | `R/03_sar.R` | De and QC classification per analysis unit, single-grain / single-aliquot modes, progress file |
+| ④ Distribution diagnostics | `R/04_distribution.R` | Overdispersion, skewness, FMM BIC, radial plot coordinates |
+| ⑤ Age model | `R/05_models.R` | Rule-based recommendation → CAM/MAM/FMM applied (draft, awaiting researcher review) |
+| ⑥ Dose rate & age | — | To be implemented once the source dose rate is provided |
+| Web entry point | `R/run.R` | JSON input → action → JSON output (the contract between PHP and R) |
+| Analysis layer entry | `R/Analysis.R` | Loads the stage files above in order |
+| ver.1.0 UI | `version1_streamlit/` | Works, but is no longer extended |
+| Web UI (PHP) | — | Design stage |
 
-### Known limitations (read before you start)
+## Design principles
 
-- **Don't trust the MAM/FMM distinction on multimodal data yet.** The recommendation
-  decision tree evaluates the positive-skew gate before the multimodal (FMM) gate.
-  Because a lognormal distribution has positive skew in the linear domain regardless of
-  partial bleaching, a genuine multi-component mixture can be misclassified as MAM.
-  Reordering the gates would affect published age values, so the redesign has been
-  deferred until after expert review.
-- **Negative/zero De values are not supported.** They are explicitly rejected because a
-  log-based model cannot be applied to them. By convention, negative De values are not
-  discarded but handled with an unlogged model instead (Galbraith & Roberts 2012); that
-  path is not implemented yet.
-- **Single-grain (multi-GRAIN) files are blocked.** This is a deliberate block to avoid
-  silently plotting an incorrect curve, not a supported feature. Since these are the
-  primary target data for MAM/FMM, supporting them is a future priority.
+- **Model selection is deterministic.** The same input and the same thresholds always give the
+  same model, because a published age must be reproducible. Literature-based rules pick the
+  model; a language model's role is limited to explaining the choice with the literature.
+- **Classify, don't silently discard.** Aliquots that fail quality checks are kept together with
+  the reasons for the verdict. An automatic exclusion would be a judgment that changes the
+  result without leaving a record.
+- **Record the parameters that change the result alongside the result.** For example, the
+  signal/background integrals change De substantially but are not stored in the measurement
+  file, so they are stamped on every SAR result row. The measurement mode, random seed,
+  sigmab, and the name and version of the packages used are recorded for the same reason.
+- **The same input gives the same result.** Luminescence estimates the De error by random
+  simulation, so the seed is fixed per analysis unit. Without it, a borderline grain passes QC
+  on one run and fails on the next.
+
+## Known limitations
+
+- **The analysis results have not yet been checked against an independent reference.** The
+  self-check only pins the current code's output to prevent regressions. The next verification
+  is a grain-by-grain comparison with the researchers' own analysis results.
+- **The judgment parameters are not finalized.** The QC criteria are Luminescence defaults; the
+  minimum number of De for a model recommendation, sigmab for single-aliquot data, and the
+  criterion for choosing an FMM component await the researchers' review.
+- **De is currently in seconds (s).** The source dose rate (Gy/s) must be applied to get Gy.
+  The "Gy" labels on the ver.1.0 screens are wrong.
+- **Do not trust the MAM/FMM distinction on multimodal data yet.** The recommendation rules
+  evaluate the positive-skew gate before the multimodality gate, so a genuine multi-component
+  mixture can be classified as MAM. This affects published ages, so it will be fixed after
+  expert review.
+- **Negative/zero De are not supported.** Log-based models cannot be applied, so the analysis
+  stops explicitly.
 
 ## Requirements
 
-- Python 3.14 (uses the project's own virtualenv)
-- R installation + the `Luminescence` package (must be installed system-wide for `rpy2`
-  to call it)
-
-On the R side:
+- R + the `Luminescence` package (`jsonlite` is installed together with Luminescence)
+- Python 3.14 (for the ver.1.0 app and its self-checks, in the project's own virtualenv)
 
 ```r
 install.packages("Luminescence")
 ```
 
-## Install & run
-
 ```bash
-source venv/bin/activate          # activate the virtualenv
-pip install -r requirements.txt   # install/update dependencies
-streamlit run app/main.py         # run the app (main entry point)
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt   # pandas, rpy2, streamlit
 ```
-
-`requirements.txt` only lists what the code actually imports (`pandas`, `rpy2`,
-`streamlit`).
-
-## Structure
-
-Three layers leading down to `rpy2`. Data flows in the **UI → utils → R** direction.
-
-```
-app/main.py            Streamlit entry point: page config, sidebar, 5 workflow tabs
-  └─ app/tabs/         one module per tab (upload / signal / sar / de implemented)
-       └─ app/utils/   bridge + state layer
-            └─ R/pipeline.R   R functions running inside the Luminescence package
-```
-
-- **`app/utils/r_runner.py`** — the sole gateway into R. `rpy2` is not thread-safe, so
-  every R access must go through the lock (`R_LOCK`) pattern here. Tabs must not call R
-  directly.
-- **`R/pipeline.R`** — the analysis functions. Reads Risø `.bin`/`.rda`/`.rdata` files,
-  summarizes positions/records, plots curves, and performs SAR and De distribution
-  analysis.
-- **`app/utils/state_manager.py`** — models the pipeline as stages with a dependency
-  graph. When a stage's input changes, that stage's output and every stage that depends
-  on it (directly or indirectly) is invalidated. To add a stage, just add an entry with
-  `depends_on` to `SESSION_SCHEMA`.
-- **`app/utils/file_utils.py`** — handles uploads and result storage. Analysis results
-  must be written to disk (`outputs/samples/{sample_id}/`) as well as session state
-  (a project requirement).
-
-More detailed design background and pitfalls live in `CLAUDE.md`.
 
 ## Verification
 
-There is no test framework or linter. Instead, each `app/utils/` module carries an
-`assert`-based self-check under `__main__`. Run them directly:
+Instead of a test framework there are `assert`-based self-checks. The analysis layer is checked
+the same way the web runs it (`Rscript`), and the fixture is built from Luminescence's bundled
+example data, so no measurement data is needed in the repository. If local single-grain test
+files (`test_data/`, not committed) are present, those checks run too.
 
 ```bash
-venv/bin/python app/utils/state_manager.py
-venv/bin/python app/utils/model_recommend.py
-venv/bin/python app/utils/r_runner.py     # requires R + Luminescence installed, ~2s
+Rscript R/selfcheck.R        # analysis layer + run.R round trips, ~16 s
 ```
 
-`r_runner.py`'s self-check generates its fixtures on the fly from Luminescence's built-in
-example dataset (`CWOSL.SAR.Data`), so no committed data is needed in the repository.
+Calling `R/run.R` directly:
+
+```bash
+echo '{"action": "inspect", "args": {"path": "/path/to/file.bin"}}' > in.json
+Rscript R/run.R in.json out.json     # 0 on success, 1 on failure; out.json holds the result or the error
+```
+
+ver.1.0 (legacy) self-checks:
+
+```bash
+venv/bin/python version1_streamlit/utils/r_runner.py        # needs R, ~2 s
+venv/bin/python version1_streamlit/utils/model_recommend.py
+venv/bin/python version1_streamlit/utils/file_utils.py
+```
+
+To see the ver.1.0 screens directly:
+
+```bash
+streamlit run version1_streamlit/main.py
+```
+
+Measurement data (`*.bin`, `*.rda`, etc.) is never committed to the repository.

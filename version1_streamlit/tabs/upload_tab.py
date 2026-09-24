@@ -1,4 +1,4 @@
-# app/tabs/upload_tab.py
+# version1_streamlit/tabs/upload_tab.py
 
 from __future__ import annotations
 
@@ -118,7 +118,7 @@ def render_upload_tab(output_dir: Path) -> None:
     Responsibilities:
         1. Upload a BIN/RDA/RData file
         2. Save the file under outputs/samples/{sample_id}/raw
-        3. Inspect the file structure and POSITION info via the R pipeline
+        3. Inspect the file structure and POSITION info via R (Analysis.R)
         4. Store current_sample and position_result in session_state
     """
 
@@ -187,7 +187,7 @@ def render_upload_tab(output_dir: Path) -> None:
     st.markdown("### POSITION inspection")
 
     st.write(
-        "Reads the uploaded file through the R pipeline and inspects its metadata, "
+        "Reads the uploaded file through R (Analysis.R) and inspects its metadata, "
         "record types, and POSITION info."
     )
 

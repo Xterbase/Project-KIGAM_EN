@@ -39,8 +39,12 @@ Rplots.pdf
 루미네선스 연대 해석을 위한 데이터 시각화 및 모델 추천 시스템 개발.pdf
 멀티에이전트_계획.txt
 
-# Institutional report: kept out of the public repo for the same reason as above
-한국지질자원연구원 중간 보고서.hwpx
+# Institutional report: kept out of the public repo for the same reason as above.
+# Its file name contains the institution's name, so it is blocked by pattern instead (this file is public too).
+*.hwpx
+
+# Claude Code private project context: holds requirement source links, institution names and meeting content
+CLAUDE.local.md
 
 # Working notes: mixed in with internal discussion. New ones appear by date, hence the pattern
 전체점검 및 수정*.txt
@@ -50,3 +54,14 @@ Rplots.pdf
 # Delete the two lines below if you want to add them.
 LumiGuide_코드구조_도식.pdf
 LumiGuide_함수흐름도.svg
+
+# Meeting notes and related material: mixed in with internal discussion, not uploaded to the public repo
+회의록&자료/
+
+
+# Never commit measurement data, wherever it is (public repository)
+*.bin
+*.BIN
+*.rda
+*.rdata
+*.RData

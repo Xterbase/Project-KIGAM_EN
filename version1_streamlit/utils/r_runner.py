@@ -12,12 +12,12 @@ from rpy2.robjects import default_converter
 # 1. Path setup and base functions
 ## Project path setup
 BASE_DIR = Path(__file__).resolve().parents[2]
-R_PIPELINE_PATH = BASE_DIR / "R" / "pipeline.R"
+R_ANALYSIS_PATH = BASE_DIR / "R" / "Analysis.R"
 
 
 ## Safety setup for rpy2
 R_LOCK = Lock()
-_PIPELINE_LOADED = False
+_ANALYSIS_LOADED = False
 
 
 ## VECTOR -> LIST
@@ -104,31 +104,31 @@ def r_scalar_float(r_vector) -> float | None:
 # ========================================================================================================================
 
 # version1: upload data
-## Load the R/pipeline.R file
-def load_r_pipeline() -> None:
+## Load the R/Analysis.R file
+def load_r_analysis() -> None:
     """
-    Source the R/pipeline.R file into the R environment.
+    Source the R/Analysis.R file into the R environment.
     Guaranteed to load only once even if called multiple times.
     """
-    global _PIPELINE_LOADED
+    global _ANALYSIS_LOADED
 
-    if _PIPELINE_LOADED:
+    if _ANALYSIS_LOADED:
         return
     
 
-    if not R_PIPELINE_PATH.exists():
-        raise FileNotFoundError(f"Could not find pipeline.R: {R_PIPELINE_PATH}")
+    if not R_ANALYSIS_PATH.exists():
+        raise FileNotFoundError(f"Could not find Analysis.R: {R_ANALYSIS_PATH}")
 
-    r_path = R_PIPELINE_PATH.as_posix()
+    r_path = R_ANALYSIS_PATH.as_posix()
 
     with R_LOCK:
-        if _PIPELINE_LOADED:
+        if _ANALYSIS_LOADED:
             return
 
         with default_converter.context():
             ro.r["source"](r_path)
 
-        _PIPELINE_LOADED = True
+        _ANALYSIS_LOADED = True
 
 
 ## Call R's inspect_positions() and convert the result to a Python dict
@@ -136,7 +136,7 @@ def inspect_uploaded_file(path: str | Path) -> dict:
     """
     Inspect the uploaded BIN/RDA/RData file with the R function inspect_positions().
 
-    R pipeline:
+    R (Analysis.R):
     - inspect_positions(path)
       - calls load_bin_data(path) internally
       - returns file info, POSITION info, and record type info
@@ -144,7 +144,7 @@ def inspect_uploaded_file(path: str | Path) -> dict:
     Python return:
     - a dict that's convenient to use directly in Streamlit
     """
-    load_r_pipeline()
+    load_r_analysis()
 
     file_path = Path(path).resolve()
 
@@ -191,7 +191,7 @@ def inspect_rlum_records(path: str | Path, position: int) -> dict:
     Look up the RLum record list for the selected POSITION with the R
     function inspect_rlum_records_by_position().
 
-    R pipeline:
+    R (Analysis.R):
     - inspect_rlum_records_by_position(path, pos)
       - calls load_bin_data(path) internally
       - returns the metadata row and RLum record info for that POSITION
@@ -199,7 +199,7 @@ def inspect_rlum_records(path: str | Path, position: int) -> dict:
     Python return:
     - a dict that's convenient to feed directly into a Streamlit record table/selectbox
     """
-    load_r_pipeline()
+    load_r_analysis()
 
     file_path = Path(path).resolve()
 
@@ -268,10 +268,10 @@ def generate_rlum_record_plot(
     """
     Save one specific record from the selected POSITION as a PNG via plot_RLum.
 
-    R pipeline:
+    R (Analysis.R):
     - save_rlum_record_plot(path, pos, record_index, output_dir)
     """
-    load_r_pipeline()
+    load_r_analysis()
 
     file_path = Path(path).resolve()
     output_dir = Path(output_dir).resolve()
@@ -311,7 +311,7 @@ def run_sar_analysis(
     """
     Run SAR analysis in batch over the selected POSITIONs and obtain De values.
 
-    R pipeline:
+    R (Analysis.R):
     - run_sar_analysis(path, positions, signal_integral, background_integral)
       - integral string parsing/validation is done in R
       - if one POSITION fails, the rest continue, and the failure reason is returned separately
@@ -320,7 +320,7 @@ def run_sar_analysis(
     - aliquots: list of per-POSITION result rows (the input to the De distribution stage)
     - failed:   the POSITIONs that failed and why
     """
-    load_r_pipeline()
+    load_r_analysis()
 
     file_path = Path(path).resolve()
 
@@ -445,7 +445,7 @@ def analyse_de_distribution(
     BIC across FMM component counts. If output_dir is given, radial/abanico
     plots are also saved.
 
-    R pipeline:
+    R (Analysis.R):
     - analyse_de_distribution(de, de_error, output_dir, prefix): distribution metrics + plots
     - fit_finite_mixture(de, de_error, sigmab): BIC per component count (for the multimodality determination)
 
@@ -464,7 +464,7 @@ def analyse_de_distribution(
     Python return:
     - distribution metrics (dict) + sigmab + "fmm" (BIC comparison dict, or None) + "fmm_error"
     """
-    load_r_pipeline()
+    load_r_analysis()
 
     if len(de) != len(de_error):
         raise ValueError(
@@ -567,7 +567,7 @@ def analyse_de_distribution(
 # Instead, Luminescence's own CWOSL.SAR.Data example is written to a
 # temporary folder on the fly.
 #
-# Run: venv/bin/python app/utils/r_runner.py   (~2 seconds)
+# Run: venv/bin/python version1_streamlit/utils/r_runner.py   (~2 seconds)
 
 def _write_fixture(target_dir: Path) -> Path:
     """Save Luminescence's example data as an .rda to build the verification input."""
@@ -771,7 +771,7 @@ if __name__ == "__main__":
                 f"CA1's {key} PNG is missing or empty"
 
         # The full chain through to the decision logic. Since the self-check
-        # runs in the app/utils context, model_recommend is imported directly
+        # runs in the version1_streamlit/utils context, model_recommend is imported directly
         # here (production code doesn't have r_runner import it).
         from model_recommend import recommend_age_model
 

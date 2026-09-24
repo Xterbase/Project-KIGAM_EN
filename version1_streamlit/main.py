@@ -1,4 +1,4 @@
-# app/main.py
+# version1_streamlit/main.py
 
 from __future__ import annotations
 
@@ -149,22 +149,31 @@ tab_upload, tab_signal, tab_sar, tab_de, tab_model = st.tabs(
 )
 
 
+# Once tabs are made a stateful widget with on_change="rerun", render only the one selected
+# via .open. Without this, every rerun re-executes all five tab bodies, and when one of them
+# (e.g. the signal tab's selectbox) registers/unregisters a widget, the tab container is
+# remounted on the frontend and operating a widget in another tab bounces the view back.
 with tab_upload:
-    render_upload_tab(OUTPUT_DIR)
+    if tab_upload.open:
+        render_upload_tab(OUTPUT_DIR)
 
 
 with tab_signal:
-    render_signal_tab()
+    if tab_signal.open:
+        render_signal_tab()
 
 
 with tab_sar:
-    render_sar_tab()
+    if tab_sar.open:
+        render_sar_tab()
 
 
 with tab_de:
-    render_de_tab()
+    if tab_de.open:
+        render_de_tab()
 
 
 with tab_model:
-    st.header("5. Model Recommendation")
-    st.info("The De-distribution-based model recommendation feature will be connected in a later stage.")
+    if tab_model.open:
+        st.header("5. Model Recommendation")
+        st.info("The De-distribution-based model recommendation feature will be connected in a later stage.")

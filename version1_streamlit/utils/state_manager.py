@@ -1,4 +1,4 @@
-# app/utils/state_manager.py
+# version1_streamlit/utils/state_manager.py
 
 from __future__ import annotations
 
@@ -453,7 +453,7 @@ def reset_all_state() -> None:
 # 10. Self-check
 # ============================================================
 # There's branching logic here, so at least one check is kept.
-# Run: venv/bin/python app/utils/state_manager.py
+# Run: venv/bin/python version1_streamlit/utils/state_manager.py
 
 if __name__ == "__main__":
     init_session_state()

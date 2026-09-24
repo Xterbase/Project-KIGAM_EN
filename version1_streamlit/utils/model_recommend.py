@@ -1,4 +1,4 @@
-# app/utils/model_recommend.py
+# version1_streamlit/utils/model_recommend.py
 """De distribution metrics -> CAM/MAM/FMM recommendation (deterministic).
 
 Reproducibility is the reason this module exists. The same input + the same
@@ -137,7 +137,7 @@ def recommend_age_model(od_rel: float | None, skewness: float | None, n: int, fm
 # ============================================================
 # There's a branching decision tree with boundary values, so each branch and
 # boundary is checked here.
-# Run: venv/bin/python app/utils/model_recommend.py
+# Run: venv/bin/python version1_streamlit/utils/model_recommend.py
 
 if __name__ == "__main__":
     # Regression-pinned on real metrics observed from fixture(ExampleData.DeValues, sigmab=0.15).

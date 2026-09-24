@@ -1,4 +1,4 @@
-# app/utils/file_utils.py
+# version1_streamlit/utils/file_utils.py
 
 from datetime import datetime
 import hashlib
@@ -420,7 +420,7 @@ def save_sar_results(analysis_results_dir: Path, result: dict) -> dict:
 # ============================================================
 # This module contains logic that deletes files, so at least one check is
 # kept for that.
-# Run: venv/bin/python app/utils/file_utils.py
+# Run: venv/bin/python version1_streamlit/utils/file_utils.py
 
 if __name__ == "__main__":
     import tempfile
