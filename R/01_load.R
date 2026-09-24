@@ -1,11 +1,11 @@
 # R/01_load.R — ① Load: file path -> Risoe.BINfileData.
-# The file cache and PNG-saving helper shared by every stage also live here.
+# The file cache shared by every stage also lives here.
 
 # ============================================================
 # Common: cache of loaded files
 # ============================================================
 # load_bin_data() is called on the first line of every entry point, such as
-# inspect_positions / inspect_rlum_records_by_position / save_rlum_record_plot.
+# inspect_positions / get_record_curve / run_sar_analysis.
 # Without a cache, every click on a record re-parses the whole BIN file, so with a
 # real-sized measurement file each click stalls for several seconds.
 #
@@ -67,14 +67,6 @@
   invisible(value)
 }
 
-clear_bin_cache <- function() {
-  rm(
-    list = ls(.bin_cache, all.names = TRUE),
-    envir = .bin_cache
-  )
-
-  invisible(TRUE)
-}
 
 # ============================================================
 # Common: data loading
@@ -286,34 +278,6 @@ load_bin_data <- function(path) {
   .bin_cache_put(cache_key, result)
 
   result
-}
-
-# ============================================================
-# Common: saving PNGs
-# ============================================================
-# Saves one plot as a PNG and returns its normalized path.
-# The macOS quartz png device writes the file only at dev.off(). If dev.off() is only
-# registered with on.exit, the existence check fails because the file is not there yet.
-# -> close explicitly right after draw() to flush; on.exit only guards against a device leak on error.
-
-.save_png <- function(file_path, draw, width, height, res, label) {
-  png(filename = file_path, width = width, height = height, res = res)
-
-  device_id <- dev.cur()
-  on.exit(
-    if (dev.cur() == device_id) dev.off(),
-    add = TRUE
-  )
-
-  draw()
-
-  dev.off()
-
-  if (!file.exists(file_path)) {
-    stop(paste0("Could not create the ", label, " image: ", file_path))
-  }
-
-  normalizePath(file_path, winslash = "/", mustWork = TRUE)
 }
 
 # ============================================================

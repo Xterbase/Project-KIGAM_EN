@@ -189,9 +189,8 @@ apply_age_model <- function(de, de_error, model, sigmab = NULL, n_components = N
 # ④ indicators -> FMM BIC -> rule recommendation -> model application.
 # With model given, a model other than the recommended one is applied, recording what was recommended and who chose.
 # It does not stop when FMM fails (insufficient sample, no convergence): the rules handle "no FMM".
-run_age_model <- function(de, de_error, sigmab, model = NULL, max_k = 4L,
-                          output_dir = NULL, prefix = "de_dist") {
-  dist <- analyse_de_distribution(de, de_error, output_dir = output_dir, prefix = prefix)
+run_age_model <- function(de, de_error, sigmab, model = NULL, max_k = 4L) {
+  dist <- analyse_de_distribution(de, de_error)
 
   fmm <- tryCatch(fit_finite_mixture(de, de_error, sigmab = sigmab, max_k = max_k),
                   error = function(e) e)

@@ -55,48 +55,18 @@
 
 # Runs SAR for one analysis unit (single-aliquot: POSITION, single-grain: POSITION+GRAIN)
 # and extracts only the needed values. found is the return value of .position_records().
-#
-# With plot_dir, the dose-response plot is saved as a PNG.
-# analyse_SAR.CWOSL() is not called twice for that:
-#   running it once with plot=TRUE inside the png device yields both the result object and the PNG.
-#   (taking the table with plot=FALSE and redrawing with plot=TRUE would compute the same thing twice)
-.dose_plot_name <- function(pos, grain) {
-  if (is.na(grain)) {
-    sprintf("position_%03d_dose_response.png", pos)
-  } else {
-    sprintf("position_%03d_grain_%03d_dose_response.png", pos, grain)
-  }
-}
-
-.run_sar_one <- function(found, signal_integral, background_integral, plot_dir = NULL) {
-  pos <- found$pos
-
-  plot_file <- NA_character_
-  want_plot <- !is.null(plot_dir) && !is.na(plot_dir) && nzchar(plot_dir)
+.run_sar_one <- function(found, signal_integral, background_integral) {
 
   # signal_integral/background_integral are c(start, end). analyse_SAR.CWOSL() takes "a vector
   # of the channels to integrate", so passing c(900, 1000) integrates only channels 900 and 1000.
   # Always pass the full start:end.
-  run_sar <- function() {
-    analyse_SAR.CWOSL(
-      object = found$obj,
-      signal_integral = seq(signal_integral[1], signal_integral[2]),
-      background_integral = seq(background_integral[1], background_integral[2]),
-      plot = want_plot,
-      verbose = FALSE
-    )
-  }
-
-  if (want_plot) {
-    res <- NULL
-    plot_file <- .save_png(
-      file.path(plot_dir, .dose_plot_name(pos, found$grain)),
-      function() res <<- run_sar(),
-      width = 1400, height = 1000, res = 150, label = "dose-response plot"
-    )
-  } else {
-    res <- run_sar()
-  }
+  res <- analyse_SAR.CWOSL(
+    object = found$obj,
+    signal_integral = seq(signal_integral[1], signal_integral[2]),
+    background_integral = seq(background_integral[1], background_integral[2]),
+    plot = FALSE,
+    verbose = FALSE
+  )
 
   if (is.null(res)) {
     stop("The SAR analysis returned no result.")
@@ -152,8 +122,6 @@
     n_n = as.numeric(get_one("n_N")),
     recycling_ratio = pick_rc("Recycling ratio"),
     recuperation = pick_rc("Recuperation"),
-    plot_file = as.character(plot_file),
-
     qc_criteria = qc_criteria,
     qc_value = qc_value,
     qc_threshold = qc_threshold,
@@ -236,7 +204,7 @@
 # the same input (measured: 1 of 49 grains flipped with the seed). Every unit gets the same
 # seed, so a verdict is reproducible regardless of which other units were selected; it is stamped on the result.
 run_sar_analysis <- function(path, positions, signal_integral, background_integral,
-                             plot_dir = NULL, mode = "single_aliquot",
+                             mode = "single_aliquot",
                              progress_file = NULL, seed = 1L) {
   loaded <- load_bin_data(path)
 
@@ -263,13 +231,6 @@ run_sar_analysis <- function(path, positions, signal_integral, background_integr
   sig <- integrals$sig
   bg <- integrals$bg
 
-  if (!is.null(plot_dir) && nzchar(plot_dir)) {
-    if (!dir.exists(plot_dir)) {
-      dir.create(plot_dir, recursive = TRUE)
-    }
-
-    plot_dir <- normalizePath(plot_dir, winslash = "/", mustWork = TRUE)
-  }
 
   # ------------------------------------------------------------
   # Build the analysis units
@@ -296,7 +257,6 @@ run_sar_analysis <- function(path, positions, signal_integral, background_integr
   ok_n_n <- numeric(0)
   ok_recycling <- numeric(0)
   ok_recuperation <- numeric(0)
-  ok_plot_file <- character(0)
   ok_warning <- character(0)
 
   # The QC table has several rows per unit, so it is stacked long with position/grain columns.
@@ -326,7 +286,7 @@ run_sar_analysis <- function(path, positions, signal_integral, background_integr
       withCallingHandlers(
         .run_sar_one(
           .position_records(bin_data, pos, if (is.na(grain)) NULL else grain),
-          sig, bg, plot_dir
+          sig, bg
         ),
         warning = function(w) {
           unit_warnings <<- c(unit_warnings, conditionMessage(w))
@@ -346,16 +306,6 @@ run_sar_analysis <- function(path, positions, signal_integral, background_integr
         trimws(as.character(attr(one, "condition")$message))
       )
 
-      # Remove an empty PNG left behind when the device opened and closed during a failure.
-      # Leaving it would suggest "there is a plot, so it succeeded".
-      if (!is.null(plot_dir) && nzchar(plot_dir)) {
-        stale <- file.path(plot_dir, .dose_plot_name(pos, grain))
-
-        if (file.exists(stale)) {
-          unlink(stale)
-        }
-      }
-
       next
     }
 
@@ -368,7 +318,6 @@ run_sar_analysis <- function(path, positions, signal_integral, background_integr
     ok_n_n <- c(ok_n_n, one$n_n)
     ok_recycling <- c(ok_recycling, one$recycling_ratio)
     ok_recuperation <- c(ok_recuperation, one$recuperation)
-    ok_plot_file <- c(ok_plot_file, one$plot_file)
     ok_warning <- c(ok_warning, paste(unique(unit_warnings), collapse = " | "))
 
     n_rows <- length(one$qc_criteria)
@@ -417,7 +366,6 @@ run_sar_analysis <- function(path, positions, signal_integral, background_integr
     n_n = as.numeric(ok_n_n),
     recycling_ratio = as.numeric(ok_recycling),
     recuperation = as.numeric(ok_recuperation),
-    plot_file = as.character(ok_plot_file),
     warning = as.character(ok_warning),
 
     qc_position = as.integer(qc_position),

@@ -4,7 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project is
 
-LumiGuide is a luminescence (OSL/TL) dating workflow assistant. It visualizes the analysis
+Luminous (working name; renamed from LumiGuide on 2026-09-24, may change again) is a
+luminescence (OSL/TL) dating workflow assistant. It visualizes the analysis
 pipeline and helps researchers pick a statistical age model (CAM / MAM / FMM, and related
 models) from the equivalent-dose (De) distribution.
 The statistics are done by the R `Luminescence` package — the project deliberately does
@@ -19,7 +20,9 @@ After a meeting with the domain researchers and the package review that followed
 project restarts on these decisions (made by the user):
 
 1. **The Streamlit frontend is retired.** The whole ver.1.0 app was moved, unchanged, from
-   `app/` to `version1_streamlit/`. It still runs; read it for reference, do not extend it.
+   `app/` to `version1_streamlit/`. Read it for reference only. Since 2026-09-24 it no longer
+   runs against the current `R/` (the PNG and record-list functions it called were removed);
+   do not restore them for it.
 2. **`Luminescence` is the reference implementation.** Other packages are added only for a
    concrete gap, per the conditional-adoption table below — never speculatively.
 3. **Analysis first, but not strictly sequential.** `R/Analysis.R` (renamed from
@@ -111,9 +114,9 @@ signatures:
   `{"ok", "action", "result" | "error", "meta"}`, exit 0/1 (the file is written either way).
   Actions: `inspect`, `curve`, `sar`, `dose_response`, `age_model`. JSON rules the browser
   relies on: array fields stay arrays even with one element (`I()`), tables are arrays of row
-  objects, NA/NaN/Inf become `null`, numbers are not rounded. The PNG functions
-  (`save_rlum_record_plot`, `plot_dir`, radial/abanico `output_dir`) remain only for the
-  legacy Streamlit app — do not build on them.
+  objects, NA/NaN/Inf become `null`, numbers are not rounded. The analysis layer draws no
+  images: the PNG path (`save_rlum_record_plot`, `.save_png`, `plot_dir`, radial/abanico
+  `output_dir`) and `inspect_rlum_records_by_position` were removed on 2026-09-24.
   - Chart data sources: `get_record_curve()` (②), `get_dose_response()` (③, same data and
     seed as `run_sar_analysis()`, so De matches the table), `analyse_de_distribution()`'s
     `radial_x/radial_y` (④, Galbraith radial coordinates around the CAM centre).
@@ -153,29 +156,27 @@ signatures:
 
 ## Commands
 
-The project virtualenv (Python 3.14) is still used for the legacy code and the self-checks:
+The analysis layer needs only R. The project virtualenv (Python 3.14) is kept for the legacy
+code, whose pure-Python checks still pass:
 
 ```bash
 Rscript R/selfcheck.R                                       # analysis-layer self-check (~15 s)
 source venv/bin/activate
-venv/bin/python version1_streamlit/utils/r_runner.py        # legacy self-check (~2 s)
 venv/bin/python version1_streamlit/utils/model_recommend.py
 venv/bin/python version1_streamlit/utils/file_utils.py
 venv/bin/python version1_streamlit/utils/state_manager.py   # Streamlit-specific
-streamlit run version1_streamlit/main.py                    # legacy ver.1.0 UI, reference only
 ```
 
 There is no test suite or linter. `R/selfcheck.R` is the analysis layer's test and runs the
 way the web layer will (`Rscript`); it builds its fixture from the installed package, so it
-needs no committed data. `r_runner.py`'s self-check is legacy — keep it passing while the
-Streamlit app remains, but add new checks to `R/selfcheck.R`. `rpy2` needs a working R with
-`Luminescence` installed.
+needs no committed data. Add new checks there. The legacy `r_runner.py` self-check and the
+Streamlit UI no longer run (they call removed R functions).
 
 ## Code as it stands
 
 ```
 R/Analysis.R                     entry point: library() + sources the stage files  ← the focus now
-R/01_load.R                      ① path → Risoe.BINfileData; file cache; .save_png helper
+R/01_load.R                      ① path → Risoe.BINfileData; file cache
 R/02_signal.R                    ② POSITION → RLum.Analysis records, curve plots
 R/03_sar.R                       ③ RLum.Analysis + integrals → De table + QC
 R/04_distribution.R              ④ De table → OD, skewness, FMM BIC, radial/abanico
@@ -201,9 +202,6 @@ It reads Risø `.bin` / `.rda` / `.rdata` into `Risoe.BINfileData` (`load_bin_da
 LRU-cached), summarizes positions/records, plots curves, runs SAR, and analyses the De
 distribution. Validation and error messages live in R and surface as exceptions.
 
-- **macOS quartz png writes the file only at `dev.off()`.** `.save_png()` (`01_load.R`)
-  closes the device right after drawing, then checks `file.exists()`; `on.exit` is only a
-  leak guard. Save every PNG through it.
 - **`analyse_SAR.CWOSL()` takes the channels themselves**: `signal_integral = 1:2`,
   `background_integral = 900:1000`. `c(900, 1000)` means channels 900 and 1000 only — the
   code passed that form until 2026-09-24, so the background used 2 channels instead of 101

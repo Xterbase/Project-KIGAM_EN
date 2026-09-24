@@ -1,8 +1,7 @@
 # R/02_signal.R — ② Signal: the RLum record list and signal curves of a chosen POSITION.
 # This is the stage where the researcher looks at the curves and sets the signal/background integrals.
 #
-#   inspect_rlum_records_by_position()  per-record summary: LTYPE, DTYPE, RUN, SET, IRR_TIME, NPOINTS, ...
-#   save_rlum_record_plot()             saves one record's curve as a PNG
+#   get_record_curve()  returns one record's curve as chart data (the browser draws it)
 #
 # OSLdecomposition (conditional adoption) plugs in between this stage and ③ SAR.
 # ---------------------------
@@ -11,7 +10,7 @@
 #
 # Background (important):
 #   record_index is built on the premise "metadata row order == RLum record order", and
-#   save_rlum_record_plot() draws obj[record_index] by that number.
+#   get_record_curve() takes the record out by that number.
 #   If the premise breaks, a curve other than the one the user picked is drawn without error.
 #
 #   Risoe.BINfileData2RLum.Analysis() builds its result per GRAIN value, so when a
@@ -93,120 +92,7 @@
   .position_records(load_bin_data(path)$bin_data, pos, grain)
 }
 
-# Summarizes the record list and per-record metadata of the chosen POSITION (+GRAIN for single-grain files).
-inspect_rlum_records_by_position <- function(path, pos, grain = NULL) {
-  found <- .load_position_records(path, pos, grain)
 
-  pos <- found$pos
-  meta_pos <- found$meta_pos
-  metadata_index <- found$metadata_index
-
-  n <- nrow(meta_pos)
-  record_index <- seq_len(n)
-
-  get_col <- function(df, col, default = NA) {
-    if (col %in% colnames(df)) {
-      return(df[[col]])
-    }
-
-    rep(default, nrow(df))
-  }
-
-  record_type <- as.character(get_col(meta_pos, "LTYPE", "UNKNOWN"))
-  dtype <- as.character(get_col(meta_pos, "DTYPE", "UNKNOWN"))
-  comment <- as.character(get_col(meta_pos, "COMMENT", ""))
-  run <- as.integer(get_col(meta_pos, "RUN", NA))
-  set <- as.integer(get_col(meta_pos, "SET", NA))
-  irr_time <- as.numeric(get_col(meta_pos, "IRR_TIME", NA))
-  npoints <- as.integer(get_col(meta_pos, "NPOINTS", NA))
-  low <- as.numeric(get_col(meta_pos, "LOW", NA))
-  high <- as.numeric(get_col(meta_pos, "HIGH", NA))
-  an_temp <- as.numeric(get_col(meta_pos, "AN_TEMP", NA))
-  an_time <- as.numeric(get_col(meta_pos, "AN_TIME", NA))
-  light_source <- as.character(get_col(meta_pos, "LIGHTSOURCE", ""))
-
-  record_label <- paste0(
-    "#", record_index,
-    " | ", record_type,
-    " | ", dtype,
-    " | ", comment,
-    " | RUN ", run,
-    " | SET ", set,
-    " | IRR ", irr_time
-  )
-
-  list(
-    position = as.integer(pos),
-    grain = as.integer(found$grain),
-    n_records = as.integer(n),
-    record_index = as.integer(record_index),
-    metadata_index = as.integer(metadata_index),
-    record_type = as.character(record_type),
-    dtype = as.character(dtype),
-    comment = as.character(comment),
-    run = as.integer(run),
-    set = as.integer(set),
-    irr_time = as.numeric(irr_time),
-    npoints = as.integer(npoints),
-    low = as.numeric(low),
-    high = as.numeric(high),
-    an_temp = as.numeric(an_temp),
-    an_time = as.numeric(an_time),
-    light_source = as.character(light_source),
-    record_label = as.character(record_label)
-  )
-}
-
-save_rlum_record_plot <- function(path, pos, record_index, output_dir, grain = NULL) {
-  # Goes through the same alignment check as inspect_rlum_records_by_position().
-  # record_index is a number that function built, so it is valid only on the same premise.
-  found <- .load_position_records(path, pos, grain)
-
-  pos <- found$pos
-  obj <- found$obj
-
-  record_index <- as.integer(record_index)
-
-  if (record_index < 1 || record_index > length(obj)) {
-    stop(
-      paste0(
-        "No such record index: ",
-        record_index,
-        " / valid range: 1:",
-        length(obj)
-      )
-    )
-  }
-
-  if (!dir.exists(output_dir)) {
-    dir.create(output_dir, recursive = TRUE)
-  }
-
-  output_dir <- normalizePath(
-    output_dir,
-    winslash = "/",
-    mustWork = TRUE
-  )
-
-  file_name <- if (is.na(found$grain)) {
-    sprintf("position_%03d_record_%03d_rlum.png", pos, record_index)
-  } else {
-    sprintf("position_%03d_grain_%03d_record_%03d_rlum.png", pos, found$grain, record_index)
-  }
-
-  normalized_file_path <- .save_png(
-    file.path(output_dir, file_name),
-    function() plot_RLum(obj[record_index]),
-    width = 1200, height = 800, res = 120, label = "Curve"
-  )
-
-  list(
-    position = as.integer(pos),
-    grain = as.integer(found$grain),
-    record_index = as.integer(record_index),
-    plot_file = as.character(normalized_file_path)
-  )
-}
 
 
 

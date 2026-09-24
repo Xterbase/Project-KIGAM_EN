@@ -16,8 +16,6 @@ expect_error <- function(expr, pattern) {
   stopifnot("expected an error but it passed" = !is.na(msg), grepl(pattern, msg))
 }
 
-png_ok <- function(f) file.exists(f) && file.info(f)$size > 0
-
 # ------------------------------------------------------------
 # 1. single-aliquot baseline (fixture built from the package example data)
 # ------------------------------------------------------------
@@ -32,8 +30,7 @@ stopifnot(
 )
 
 progress <- file.path(tmp, "progress.json")
-sar <- run_sar_analysis(fixture, 1:24, "1:2", "900:1000",
-                        plot_dir = file.path(tmp, "sar"), progress_file = progress)
+sar <- run_sar_analysis(fixture, 1:24, "1:2", "900:1000", progress_file = progress)
 
 stopifnot(
   "24/24 analysed" = sar$n_success == 24,
@@ -45,7 +42,6 @@ stopifnot(
   # Passing the integral as c(start, end) integrates only two channels and raises this warning (past defect).
   "no integral warning" = !any(grepl("please check your input", sar$warning)),
   "single-aliquot has grain NA" = all(is.na(sar$grain)),
-  "dose-response PNG" = png_ok(sar$plot_file[1]),
   "progress file shows completion" = identical(readLines(progress), '{"done": 24, "total": 24}')
 )
 
@@ -54,8 +50,8 @@ expect_error(
   "only possible for files with GRAIN numbers"
 )
 
-curve <- save_rlum_record_plot(fixture, 1, 2, file.path(tmp, "curve"))
-stopifnot("curve PNG" = png_ok(curve$plot_file))
+curve <- get_record_curve(fixture, 1, 2)
+stopifnot("curve data" = length(curve$x) == length(curve$y) && length(curve$x) > 1)
 
 cat("[OK] single-aliquot baseline\n")
 
@@ -88,13 +84,13 @@ for (case in sg_cases) {
 
   # A disc with several grains must be refused when requested without a GRAIN (prevents misaligned curves).
   p_multi <- as.integer(names(which(table(info$grain_position) > 1))[1])
-  expect_error(inspect_rlum_records_by_position(f, p_multi), "A GRAIN must be given")
+  expect_error(get_record_curve(f, p_multi, 1), "A GRAIN must be given")
 
-  recs <- inspect_rlum_records_by_position(f, p1, grain = g1)
-  stopifnot("records of one grain" = recs$n_records %in% c(16L, 18L), recs$grain == g1)
+  recs <- .load_position_records(f, p1, grain = g1)
+  stopifnot("records of one grain" = length(recs$obj) %in% c(16L, 18L), recs$grain == g1)
 
-  curve <- save_rlum_record_plot(f, p1, 1, file.path(tmp, "sg_curve"), grain = g1)
-  stopifnot("grain curve PNG" = png_ok(curve$plot_file), grepl("_grain_", curve$plot_file))
+  curve <- get_record_curve(f, p1, 1, grain = g1)
+  stopifnot("grain curve data" = curve$grain == g1 && length(curve$y) == 100)
 
   a <- run_sar_analysis(f, info$positions, "6:10", "81:100", mode = "single_grain")
   a_de <- a$de[a$rc_status == "OK"]

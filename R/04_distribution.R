@@ -1,8 +1,8 @@
-# R/04_distribution.R — ④ Distribution diagnostics: De table -> OD, skewness/kurtosis, FMM BIC, radial/abanico plots.
+# R/04_distribution.R — ④ Distribution diagnostics: De table -> OD, skewness/kurtosis, FMM BIC, radial plot coordinates.
 # numOSL sensSAM (conditional adoption) plugs in between this stage's indicators and ⑤ age model, as backing for the model choice.
 # ============================================================
-# Takes the De values from SAR (De + error), computes the distribution characteristics,
-# and saves radial/abanico plots as PNGs. The indicators produced here (OD, skewness, multimodality)
+# Takes the De values from SAR (De + error) and computes the distribution characteristics and radial plot coordinates.
+# The indicators produced here (OD, skewness, multimodality)
 # are the input of the next stage (CAM/MAM/FMM recommendation).
 #
 # The statistics come straight from Luminescence functions (project principle: do not reimplement):
@@ -15,9 +15,7 @@
 # fixture (BT998, n=25) confirmed is unreliable. So multimodality is judged the standard way
 # in the next stage (model recommendation), and this function only returns robust indicators such as OD/skewness/kurtosis.
 
-# With output_dir, radial/abanico PNGs are saved. Without it, only the indicators are computed
-# (for calls that need no figures, such as the r_runner self-check).
-analyse_de_distribution <- function(de, de_error, output_dir = NULL, prefix = "de_dist") {
+analyse_de_distribution <- function(de, de_error) {
   # --- input validation ---
   de <- as.numeric(de)
   de_error <- as.numeric(de_error)
@@ -79,29 +77,6 @@ analyse_de_distribution <- function(de, de_error, output_dir = NULL, prefix = "d
   # --- skewness/kurtosis ---
   stats <- calc_Statistics(data)
 
-  # --- save plots (only with output_dir) ---
-  radial_file <- NA_character_
-  abanico_file <- NA_character_
-
-  if (!is.null(output_dir) && !is.na(output_dir) && nzchar(output_dir)) {
-    if (!dir.exists(output_dir)) {
-      dir.create(output_dir, recursive = TRUE)
-    }
-
-    output_dir <- normalizePath(output_dir, winslash = "/", mustWork = TRUE)
-
-    radial_file <- .save_png(
-      file.path(output_dir, paste0(prefix, "_radial.png")),
-      function() plot_RadialPlot(data),
-      width = 1400, height = 1000, res = 150, label = "De distribution plot"
-    )
-
-    abanico_file <- .save_png(
-      file.path(output_dir, paste0(prefix, "_abanico.png")),
-      function() plot_AbanicoPlot(data),
-      width = 1400, height = 1000, res = 150, label = "De distribution plot"
-    )
-  }
 
   list(
     n = as.integer(n),
@@ -124,9 +99,6 @@ analyse_de_distribution <- function(de, de_error, output_dir = NULL, prefix = "d
     mean_de = as.numeric(stats$unweighted$mean),
     median_de = as.numeric(stats$unweighted$median),
     sd_rel = as.numeric(stats$unweighted$sd.rel),
-
-    radial_plot_file = as.character(radial_file),
-    abanico_plot_file = as.character(abanico_file),
 
     # Data for the browser to draw. de/de_error are the values after dropping NA (same order as radial).
     # Radial plot (Galbraith 1988) coordinates: z = log(De), s = relative error (De.Error/De),

@@ -1,4 +1,6 @@
-# LumiGuide
+# Luminous
+
+> Working name. Renamed from LumiGuide on 2026-09-24; the final name is not decided.
 
 A workflow assistant for luminescence (OSL/TL) dating.
 
@@ -99,18 +101,8 @@ echo '{"action": "inspect", "args": {"path": "/path/to/file.bin"}}' > in.json
 Rscript R/run.R in.json out.json     # 0 on success, 1 on failure; out.json holds the result or the error
 ```
 
-ver.1.0 (legacy) self-checks:
-
-```bash
-venv/bin/python version1_streamlit/utils/r_runner.py        # needs R, ~2 s
-venv/bin/python version1_streamlit/utils/model_recommend.py
-venv/bin/python version1_streamlit/utils/file_utils.py
-```
-
-To see the ver.1.0 screens directly:
-
-```bash
-streamlit run version1_streamlit/main.py
-```
+ver.1.0 (legacy) is kept for reference only. The image (PNG) saving functions were removed from the
+analysis layer on 2026-09-24, so the ver.1.0 screens and the `r_runner.py` self-check no longer run
+against the current R code.
 
 Measurement data (`*.bin`, `*.rda`, etc.) is never committed to the repository.
