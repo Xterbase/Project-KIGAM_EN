@@ -15,7 +15,8 @@ library(Luminescence)
 local({
   # Location of this file = ofile of the innermost source() frame. It must work regardless of the
   # working directory or whether it was source()d from inside another script (nested).
-  ofiles <- Filter(Negate(is.null), lapply(sys.frames(), function(f) f$ofile))
+  ofiles <- Filter(Negate(is.null), lapply(sys.frames(), function(f) f$ofile))  # "Where is the file running right now?" 
+  # sys.frames(): the list of function frames on the current call stack
   here <- dirname(normalizePath(ofiles[[length(ofiles)]], winslash = "/"))
 
   for (f in c("01_load.R", "02_signal.R", "03_sar.R", "04_distribution.R", "05_models.R")) {

@@ -5,8 +5,8 @@
 #   run_age_model()        ④ indicators + FMM BIC + recommendation + application in one call (the web layer's entry point)
 #
 # The rules are moved over unchanged from version1_streamlit/utils/model_recommend.py (so the choice
-# is reproducible in one place, R). The gate order (skewness MAM before multimodal FMM) is a known defect
-# that can be wrong on multimodal data, but it changes published ages, so it is not changed before expert review.
+# is reproducible in one place, R). 
+# The gate order (skewness MAM before multimodal FMM) is a known defect that can be wrong on multimodal data, but it changes published ages, so it is not changed before expert review.
 #
 # numOSL mcMAM/mcFMM (conditional adoption) plug in beside apply_age_model(), for comparison.
 #

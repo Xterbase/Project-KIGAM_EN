@@ -14,7 +14,7 @@
 #
 # Actions (args):
 #   inspect        path
-#   curve          path, position, record_index, grain?
+#   curve          path, position, record_index, grain?, mode?
 #   sar            path, positions, signal_integral, background_integral, mode?, seed?, progress_file?
 #   dose_response  path, position, signal_integral, background_integral, grain?, mode?, seed?
 #   age_model      de, de_error, sigmab, model?, max_k?
@@ -68,7 +68,7 @@ suppressPackageStartupMessages({
   },
 
   curve = function(a) {
-    r <- get_record_curve(a$path, a$position, a$record_index, grain = .opt(a, "grain"))
+    r <- get_record_curve(a$path, a$position, a$record_index, grain = .opt(a, "grain"), mode = .opt(a, "mode"))
     r$x <- .arr(r$x)
     r$y <- .arr(r$y)
     r

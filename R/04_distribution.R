@@ -52,9 +52,10 @@ analyse_de_distribution <- function(de, de_error) {
 
   # Log-based models (CAM/MAM/FMM) cannot take negative/zero De. calc_CentralDose, under the
   # default log=TRUE, meets a negative value with only a console warning and silently falls back to
-  # linear mode, producing an OD not comparable with log-domain thresholds. Stop explicitly before that.
-  # By convention negative De are not discarded but handled by unlogged models (Galbraith & Roberts 2012);
-  # the unlogged path is not supported yet, so for now the analysis stops.
+  # linear mode, producing an OD not comparable with log-domain thresholds. 
+  
+  # Stop explicitly before that. By convention negative De are not discarded but handled by unlogged models (Galbraith & Roberts 2012); the unlogged path is not supported yet, so for now the analysis stops.
+  
   # Add unlogged MAM/CAM paths when supporting single-grain data (where negative De are common).
   n_nonpositive <- sum(de <= 0)
   if (n_nonpositive > 0) {
@@ -100,7 +101,8 @@ analyse_de_distribution <- function(de, de_error) {
     median_de = as.numeric(stats$unweighted$median),
     sd_rel = as.numeric(stats$unweighted$sd.rel),
 
-    # Data for the browser to draw. de/de_error are the values after dropping NA (same order as radial).
+    ## Data for the browser to draw. 
+    # de/de_error are the values after dropping NA (same order as radial).
     # Radial plot (Galbraith 1988) coordinates: z = log(De), s = relative error (De.Error/De),
     #   x = 1/s (precision), y = (z - log(CAM central value)) / s (standardized distance).
     # Points on the same line through the origin have the same De. A display transform, not a statistic.
@@ -115,15 +117,16 @@ analyse_de_distribution <- function(de, de_error) {
 # ------------------------------------------------------------
 # BIC comparison for judging FMM multimodality
 # ------------------------------------------------------------
-# Fits component counts k=2..max_k with calc_FiniteMixture and compares their BIC with the
-# single component (k=1). The verdict "it is multimodal" is not made here — its threshold
-# belongs to the recommendation logic (model_recommend.py); this function only returns the BIC needed for the comparison.
+# Fits component counts k=2..max_k with calc_FiniteMixture and compares their BIC with the single component (k=1). 
+# The verdict "it is multimodal" is not made here — its threshold belongs to the recommendation logic (model_recommend.py); this function only returns the BIC needed for the comparison.
+
 # Choosing a discrete mixture by per-component-count BIC is the standard in the OSL literature
 # (Galbraith & Green 1990; Roberts et al. 2000; David et al. 2007).
 #
 # The result is sensitive to sigmab (the assumed within-component overdispersion). On the CA1 fixture
-# sigmab 0.15 gives multiple components and 0.30 a single one. So sigmab is taken as an argument
-# and returned, recording which value the verdict used.
+# sigmab 0.15 gives multiple components and 0.30 a single one. 
+
+# So sigmab is taken as an argument and returned, recording which value the verdict used.
 .fmm_max_k <- function(n) as.integer(n %/% 2L)
 
 fit_finite_mixture <- function(de, de_error, sigmab = 0.15, max_k = 4L) {

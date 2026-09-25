@@ -1,0 +1,214 @@
+/* web/assets/app.css — Luminous shared styles (after the Operate style reference: sage canvas, hairlines, mono-green family).
+   Colours are defined only here in :root. The charts in app.js read the same variables. */
+
+/* Pretendard (SIL OFL, fonts/LICENSE.txt): one typeface for Latin and Korean, served by the server with no external CDN.
+   Only the two weights the design uses (400, 500) are included. The subset holds 2,780 common Hangul syllables,
+   so other characters fall back to the next font (--font). If the full set is needed, swap in PretendardVariable.woff2 (2 MB). */
+@font-face {
+  font-family: "Pretendard";
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/Pretendard-Regular.subset.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Pretendard";
+  font-weight: 500;
+  font-display: swap;
+  src: url("fonts/Pretendard-Medium.subset.woff2") format("woff2");
+}
+
+:root {
+  --forest-ink: #09352e;   /* body text, icons, curves */
+  --bone-white: #ffffff;   /* card surface */
+  --sage-paper: #e0e0e0;   /* canvas */
+  --ash-gray: #e5e5e5;     /* recessed surface inside cards */
+  --muted-sage: #77aa83;   /* fitted curve, soft fills */
+  --lichen: #cad3d2;       /* hairlines, dotted grid */
+  --slate-smoke: #6c7a79;  /* secondary text */
+  --charcoal-bark: #29211e;
+  --moss: #85c093;         /* the one filled button per screen */
+  --deep-fern: #007010;    /* links */
+  --emerald: #008023;      /* data points */
+  --indigo-accent: #433787; /* once per page: natural signal → De marker */
+
+  /* Verdict colours stay outside the style reference (Okabe-Ito, so pass/fail stay distinct with colour-vision deficiency). */
+  --pass: #009e73;
+  --fail: #d55e00;
+
+  --font: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+
+  --hairline: inset 0 0 0 0.5px var(--lichen);
+  --radius-tag: 4px;
+  --radius-card: 12px;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }   /* so the hidden attribute also hides elements given a display (labels etc.) */
+
+body {
+  margin: 0;
+  font: 400 14px/1.5 var(--font);
+  letter-spacing: 0.012em;
+  font-feature-settings: "liga" 0;
+  color: var(--forest-ink);
+  background-color: var(--sage-paper);
+  /* A faint dot grid over the whole canvas (graph-paper feel). */
+  background-image: radial-gradient(var(--lichen) 0.8px, transparent 0.8px);
+  background-size: 16px 16px;
+}
+
+h1, h2, h3 { font-weight: 500; margin: 0; letter-spacing: 0; }
+b, strong { font-weight: 500; }   /* only two weights, 400 and 500 (prevents a faux bold imitating 700) */
+h1 { font-size: 32px; line-height: 1.17; }
+h2 { font-size: 20px; line-height: 1.35; margin-bottom: 12px; }
+h3 { font-size: 16px; line-height: 1.44; margin: 20px 0 8px; }
+
+a { color: var(--deep-fern); font-weight: 500; text-decoration: none; }
+a:hover { text-decoration: underline; }
+.bracket::before { content: "[ "; }
+.bracket::after { content: " ]"; }
+
+/* Bracketed axis label at the head of a section: [ 02 · Signal ] */
+.axis { font-size: 12px; font-weight: 500; letter-spacing: -0.01em; color: var(--forest-ink); margin: 0 0 8px; }
+.axis::before { content: "[ "; }
+.axis::after { content: " ]"; }
+
+.note { color: var(--slate-smoke); font-size: 12px; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* Card: a sheet of white paper. A 0.5px hairline instead of a shadow. */
+.card {
+  background: var(--bone-white);
+  border-radius: var(--radius-card);
+  box-shadow: var(--hairline);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.card.error { box-shadow: inset 0 0 0 1px var(--fail); color: var(--charcoal-bark); }
+
+button, input, select { font: inherit; letter-spacing: inherit; color: var(--forest-ink); }
+
+button {
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  box-shadow: inset 0 0 0 0.5px var(--forest-ink);
+  border-radius: 12px;
+  padding: 8px 16px;
+  font-weight: 500;
+}
+button:hover { background: var(--ash-gray); }
+button:disabled { opacity: 0.4; cursor: default; background: transparent; }
+button.primary { background: var(--moss); box-shadow: none; padding: 10px 20px; }
+button.primary:hover { background: #77b286; }
+button.primary:disabled { background: var(--moss); }
+
+input[type=text], select {
+  background: var(--bone-white);
+  border: 0;
+  box-shadow: inset 0 0 0 0.5px var(--slate-smoke);
+  border-radius: var(--radius-tag);
+  padding: 6px 8px;
+}
+input[type=text] { width: 96px; font-variant-numeric: tabular-nums; }
+input[type=text]:invalid { box-shadow: inset 0 0 0 1px var(--fail); }
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--deep-fern); outline-offset: 2px; }
+
+label { display: inline-flex; align-items: center; gap: 8px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 12px; }
+
+/* Segmented choice (measurement mode A/B) */
+.seg { display: inline-flex; box-shadow: inset 0 0 0 0.5px var(--forest-ink); border-radius: 12px; padding: 2px; }
+.seg button { box-shadow: none; border-radius: 10px; padding: 6px 14px; }
+.seg button.on { background: var(--forest-ink); color: var(--bone-white); }
+
+/* Tables */
+.tablewrap { overflow: auto; max-height: 420px; border-radius: var(--radius-card); box-shadow: var(--hairline); background: var(--bone-white); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 0.5px solid var(--lichen); white-space: nowrap; }
+th { position: sticky; top: 0; background: var(--bone-white); color: var(--slate-smoke); font-size: 11px; font-weight: 500; letter-spacing: -0.01em; }
+tr.pick { cursor: pointer; }
+tr.pick:hover { background: var(--ash-gray); }
+tr.sel { background: #e6f1e8; }
+.ok { color: var(--pass); font-weight: 500; }
+.no { color: var(--fail); font-weight: 500; }
+
+/* Fact summary grid */
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 16px; }
+.facts span { display: block; color: var(--slate-smoke); font-size: 11px; }
+.facts b { display: block; font-size: 18px; font-weight: 500; line-height: 1.4; overflow-wrap: anywhere; }
+
+/* ---------- Upload page ---------- */
+.page { max-width: 1280px; margin: 0 auto; padding: 48px 24px 64px; }
+.page .lead { color: var(--slate-smoke); margin: 8px 0 32px; }
+.upload { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+.upload input[type=file] { font-size: 13px; }
+
+/* ---------- Dashboard ---------- */
+.layout { display: grid; grid-template-columns: 2fr 8fr; min-height: 100vh; }
+
+/* Left step navigation: dots joined by a line (a timeline) show the order of the analysis. */
+nav { padding: 32px 20px; border-right: 0.5px solid var(--lichen); }
+nav .brand { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
+nav .file { font-size: 12px; color: var(--slate-smoke); overflow-wrap: anywhere; margin-bottom: 32px; }
+nav ol { list-style: none; margin: 0 0 32px; padding: 0; }
+nav li { position: relative; padding: 0 0 20px 24px; }
+nav li::before {   /* hairline between dots */
+  content: ""; position: absolute; left: 4.5px; top: 14px; bottom: -2px; width: 1px; background: var(--forest-ink);
+}
+nav li:last-child::before { display: none; }
+nav li a { display: block; color: var(--forest-ink); font-weight: 400; }
+nav li a::before {   /* timeline dot */
+  content: ""; position: absolute; left: 0; top: 5px; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--bone-white); box-shadow: inset 0 0 0 0.5px var(--forest-ink), 0 0 0 0.5px var(--forest-ink);
+}
+nav li a.on { font-weight: 500; }
+nav li a.on::before { background: var(--forest-ink); }
+nav li small { display: block; color: var(--slate-smoke); font-size: 11px; }
+
+main { padding: 32px 32px 64px; min-width: 0; max-width: 1280px; }
+
+/* A line that always shows the conditions a result came from */
+.context { display: flex; flex-wrap: wrap; gap: 4px 20px; font-size: 12px; color: var(--slate-smoke); padding: 0 0 12px; margin-bottom: 24px;
+           border-bottom: 0.5px solid var(--lichen); }
+.context b { color: var(--forest-ink); font-weight: 500; }
+
+section { display: none; }
+section:target { display: block; }
+main:not(:has(section:target)) #file { display: block; }
+
+/* Charts sit on the canvas without a card (data points on paper). Only a top hairline. */
+.plotbox { border-top: 0.5px solid var(--lichen); padding-top: 8px; min-width: 0; }
+.plot { width: 100%; height: 300px; }
+.plot.tall { height: 360px; }
+.plot .empty { display: flex; height: 100%; align-items: center; justify-content: center; color: var(--slate-smoke); font-size: 12px; }
+
+.dash { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 32px; margin-bottom: 32px; }
+.lower { display: grid; grid-template-columns: 300px 1fr; gap: 32px; }
+.dash > *, .lower > * { min-width: 0; }
+@media (max-width: 1000px) {
+  .layout { grid-template-columns: 1fr; }
+  nav { border-right: 0; border-bottom: 0.5px solid var(--lichen); padding-bottom: 8px; }
+  .dash, .lower { grid-template-columns: 1fr; }
+}
+
+.selbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.selbar .big { font-size: 18px; font-weight: 500; }
+
+/* Disc map: holes are circles. Pass/fail are filled circles, holes absent from the file are empty circles. */
+.map { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
+.map.discs { grid-template-columns: repeat(6, 1fr); }
+.cell { aspect-ratio: 1; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px;
+        color: var(--slate-smoke); box-shadow: inset 0 0 0 0.5px var(--lichen); user-select: none; }
+.cell.pass { background: var(--pass); color: var(--bone-white); box-shadow: none; cursor: pointer; }
+.cell.fail { background: var(--fail); color: var(--bone-white); box-shadow: none; cursor: pointer; }
+.cell.cur { outline: 2px solid var(--forest-ink); outline-offset: 1px; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11px; color: var(--slate-smoke); margin-top: 8px; }
+.legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+
+.big { font-size: 20px; font-weight: 500; }
+
+/* Floating round chip: computation status */
+.chip { position: fixed; left: 20px; bottom: 20px; background: var(--forest-ink); color: var(--bone-white); border-radius: 9999px;
+        padding: 6px 14px; font-size: 12px; font-weight: 500; display: none; }
+.chip.show { display: block; }

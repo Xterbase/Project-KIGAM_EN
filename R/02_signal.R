@@ -1,7 +1,7 @@
 # R/02_signal.R — ② Signal: the RLum record list and signal curves of a chosen POSITION.
 # This is the stage where the researcher looks at the curves and sets the signal/background integrals.
 #
-#   get_record_curve()  returns one record's curve as chart data (the browser draws it)
+#   get_record_curve() : returns one record's curve as chart data (the browser draws it)
 #
 # OSLdecomposition (conditional adoption) plugs in between this stage and ③ SAR.
 # ---------------------------
@@ -22,7 +22,7 @@
 # Why bin_data is taken directly: single-aliquot mode must take records from the object
 # converted by convert_SG2MG(), not from the file.
 
-.position_records <- function(bin_data, pos, grain = NULL) {
+.position_records <- function(bin_data, pos, grain = NULL) {   # take a position's (+grain's) records and verify their alignment
   metadata <- bin_data@METADATA
 
   pos <- as.integer(pos)
@@ -33,7 +33,7 @@
   }
 
   grains <- sort(unique(metadata$GRAIN[in_pos]))
-  grains <- grains[!is.na(grains)]
+  grains <- grains[!is.na(grains)]  # guard against rows with an empty GRAIN
 
   if (is.null(grain)) {
     if (length(grains) > 1) {
@@ -46,7 +46,7 @@
         )
       )
     }
-
+# Stop at once if a position has 2+ grains: without a grain, record_index and the actual curve would not match.
     metadata_index <- which(in_pos)
     obj <- Risoe.BINfileData2RLum.Analysis(object = bin_data, pos = pos)
   } else {
@@ -63,6 +63,10 @@
   meta_pos <- metadata[metadata_index, , drop = FALSE]
   label <- if (is.null(grain)) paste0("POSITION ", pos) else paste0("POSITION ", pos, " GRAIN ", grain)
 
+
+## Final check: metadata row order and RLum record order must match 1:1.
+# (1) the result is a single RLum.Analysis, not a list;
+# (2) metadata_index and obj have the same length (= table row order matches RLum record order 1:1).
   if (length(obj) == 0) {
     stop(paste0("No RLum records found for ", label, "."))
   }
@@ -88,7 +92,7 @@
   )
 }
 
-.load_position_records <- function(path, pos, grain = NULL) {
+.load_position_records <- function(path, pos, grain = NULL) {  # takes a path and calls .position_records() (bin_data cached).
   .position_records(load_bin_data(path)$bin_data, pos, grain)
 }
 
@@ -97,9 +101,16 @@
 
 
 # Returns one record's curve as chart data (the browser draws it).
+# Returns a single curve's x, y for the browser.
 # x is stimulation time (s) for OSL/IRSL and temperature (°C) for TL; record_type tells which.
-get_record_curve <- function(path, pos, record_index, grain = NULL) {
-  found <- .load_position_records(path, pos, grain)
+# With mode = "single_aliquot" it returns the curve SAR actually uses: for a single-grain file, the
+# per-disc sum from convert_SG2MG() (grain is ignored). After summing, record order is the same as one grain's.
+get_record_curve <- function(path, pos, record_index, grain = NULL, mode = NULL) {
+  if (identical(mode, "single_aliquot")) {
+    found <- .position_records(.mode_bin_data(load_bin_data(path), mode), pos)
+  } else {
+    found <- .load_position_records(path, pos, grain)
+  }
   record_index <- as.integer(record_index)
 
   if (record_index < 1 || record_index > length(found$obj)) {

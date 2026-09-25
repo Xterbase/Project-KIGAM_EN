@@ -14,7 +14,7 @@
 #
 # Risoe.BINfileData objects use a lot of memory, so only the most recent N are kept (LRU).
 
-.bin_cache <- new.env(parent = emptyenv())
+.bin_cache <- new.env(parent = emptyenv())  # so the same .bin file is not parsed twice
 .BIN_CACHE_MAX_ENTRIES <- 3L
 
 .bin_cache_key <- function(normalized_path) {
@@ -27,6 +27,9 @@
     sep = "|"
   )
 }
+# The actual key built by lines 20-29 looks like
+# /Users/.../R/01_load.R|1790251574.50434|10194
+#           path        | modified time (s) | size (bytes)
 
 .bin_cache_get <- function(key) {
   if (!exists(key, envir = .bin_cache, inherits = FALSE)) {

@@ -34,7 +34,7 @@ raw data → signal analysis → De distribution analysis → model recommendati
 | Web entry point | `R/run.R` | JSON input → action → JSON output (the contract between PHP and R) |
 | Analysis layer entry | `R/Analysis.R` | Loads the stage files above in order |
 | ver.1.0 UI | `version1_streamlit/` | Works, but is no longer extended |
-| Web UI (PHP) | — | Design stage |
+| Web UI (PHP) | `web/`, `php/bridge.php` | Upload → signal curve → SAR → De distribution dashboard → model (prototype) |
 
 ## Design principles
 
@@ -100,6 +100,16 @@ Calling `R/run.R` directly:
 echo '{"action": "inspect", "args": {"path": "/path/to/file.bin"}}' > in.json
 Rscript R/run.R in.json out.json     # 0 on success, 1 on failure; out.json holds the result or the error
 ```
+
+To run the web app locally (uploaded files are stored in `outputs/samples/` and never committed):
+
+```bash
+php -S localhost:8000 -t web -d upload_max_filesize=200M -d post_max_size=200M
+```
+
+On the server, deploy with `git clone` and update only with `git pull --ff-only`; never edit code on
+the server. The web server's DocumentRoot must point at `web/` only (pointing it at the repository
+root would expose `.git/` and uploaded measurement files by URL).
 
 ver.1.0 (legacy) is kept for reference only. The image (PNG) saving functions were removed from the
 analysis layer on 2026-09-24, so the ver.1.0 screens and the `r_runner.py` self-check no longer run
