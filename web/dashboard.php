@@ -20,7 +20,7 @@ if ($meta === null || $inspect === null) {
 }
 ?>
 <!doctype html>
-<html lang="en">
+<html lang="ko">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -39,71 +39,108 @@ if ($meta === null || $inspect === null) {
   <nav>
     <div class="brand">Luminous</div>
     <div class="file"><?= h($meta['original_name']) ?></div>
-    <ol>
-      <li><a href="#file">File<small>discs · grains</small></a></li>
-      <li><a href="#signal">Signal<small>curves · analysis settings</small></a></li>
-      <li><a href="#dist">De distribution<small>dashboard at a glance</small></a></li>
-      <li><a href="#model">Model<small>recommendation · representative dose</small></a></li>
-    </ol>
-    <a class="bracket" href="./">Upload another file</a>
+    <!-- Tree menu: the selected tab becomes a white box (pill) joined to the content panel on the right. Sub-items expand only under the selected tab. -->
+    <ul class="tree" id="tree">
+      <li class="pill" id="pill" aria-hidden="true"></li>
+      <li data-v="upload"><a class="tab" href="#upload"><span class="dot"></span>Upload<span class="num">01</span></a>
+        <div class="sub"><ul><li><a href="#file">File layout</a></li><li><a href="#upfile">Upload another file</a></li><li><a href="#uplist">Samples</a></li></ul></div></li>
+      <li data-v="signal"><a class="tab" href="#signal"><span class="dot"></span>Signal analysis<span class="num">02</span></a>
+        <div class="sub"><ul><li><a href="#sigcurve">Curves</a></li><li><a href="#sigrun">Analysis settings · SAR</a></li></ul></div></li>
+      <li data-v="dash"><a class="tab" href="#dash"><span class="dot"></span>Dashboard<span class="num">03</span></a>
+        <div class="sub"><ul><li><a href="#dplots">Four charts</a></li><li><a href="#dmap">Disc map</a></li><li><a href="#dtable">Results per unit</a></li><li><a href="#dqc">QC of selected unit</a></li></ul></div></li>
+      <li data-v="model"><a class="tab" href="#model"><span class="dot"></span>Age model<span class="num">04</span></a>
+        <div class="sub"><ul><li><a href="#modelBox">Recommendation · representative dose</a></li></ul></div></li>
+    </ul>
   </nav>
 
-  <main>
+  <main class="panel">
     <div class="context" id="context"></div>
 
-    <section id="file">
-      <p class="axis">01 · File</p>
-      <h2>File layout</h2>
+    <section class="view" id="upload">
+      <p class="axis">01 · Upload</p>
+      <h2 id="file">File layout</h2>
       <div class="card facts" id="facts"></div>
       <h3>Discs</h3>
       <div class="tablewrap"><table id="discs"></table></div>
+
+      <h3 id="upfile">Upload another file</h3>
+      <!-- index.php handles the upload (save → inspect → redirect to the new dashboard). -->
+      <form method="post" action="./" enctype="multipart/form-data" id="upForm">
+        <label class="drop" id="drop">
+          <input type="file" name="bin" accept=".bin,.BIN,.rda,.rdata,.RData" hidden>
+          <b>Drop a BIN / RDA file here</b><span class="note">or click to choose · after upload the file layout is read and the new dashboard opens (a few seconds)</span>
+        </label>
+      </form>
+
+      <h3 id="uplist">Samples</h3>
+      <div class="tablewrap">
+        <table>
+          <tr><th>Uploaded</th><th>File</th><th>Measurement mode</th><th>Discs</th><th>Grains</th><th></th></tr>
+          <?php foreach (list_samples() as $s): ?>
+            <tr<?= $s['id'] === $id ? ' class="sel"' : '' ?>>
+              <td class="num"><?= h(substr((string) ($s['uploaded_at'] ?? ''), 0, 16)) ?></td>
+              <td><?= h($s['original_name'] ?? '') ?></td>
+              <td><?= sample_mode($s) ?></td>
+              <td class="num"><?= h($s['n_positions'] ?? '—') ?></td>
+              <td class="num"><?= !empty($s['single_grain']) ? h($s['n_grains']) : '—' ?></td>
+              <td><?= $s['id'] === $id ? '<span class="note">Current file</span>' : '<a class="bracket" href="dashboard.php?id=' . h($s['id']) . '">Open</a>' ?></td>
+            </tr>
+          <?php endforeach; ?>
+        </table>
+      </div>
     </section>
 
-    <section id="signal">
-      <p class="axis">02 · Signal</p>
-      <h2>Signal curve</h2>
-      <div class="row">
+    <section class="view" id="signal">
+      <p class="axis">02 · Signal analysis</p>
+      <h2>Signal curves and analysis settings</h2>
+      <div class="row" id="sigcurve">
         <label>Disc <select id="selPos"></select></label>
         <label id="grainLabel">Grain <select id="selGrain"></select></label>
         <label>Record <select id="selRec"></select></label>
       </div>
+      <div class="howto"></div>
       <div class="plotbox"><div id="curvePlot" class="plot tall"></div></div>
       <p class="note" id="curveInfo"></p>
 
-      <div class="card" style="margin-top:24px">
-        <h3 style="margin-top:0">Analysis settings</h3>
-        <form id="runForm" class="row" style="margin-bottom:8px">
-          <span class="seg" id="modeSeg"></span>
-          <label>Signal integral <input type="text" id="sig" placeholder="e.g. 6:10" pattern="\s*\d+\s*:\s*\d+\s*" required></label>
-          <label>Background integral <input type="text" id="bg" placeholder="e.g. 81:100" pattern="\s*\d+\s*:\s*\d+\s*" required></label>
-          <button type="submit" class="primary" id="runBtn">Run SAR</button>
-          <span class="note" id="runStatus"></span>
+      <h3 id="sigrun">Analysis settings</h3>
+      <div class="card">
+        <form id="runForm">
+          <div class="row">
+            <span class="seg" id="modeSeg"><span class="thumb"></span></span>
+            <label>Signal integral <input type="text" id="sig" placeholder="e.g. 6:10" pattern="\s*\d+\s*:\s*\d+\s*" required></label>
+            <label>Background integral <input type="text" id="bg" placeholder="e.g. 81:100" pattern="\s*\d+\s*:\s*\d+\s*" required></label>
+          </div>
+          <div class="row" style="margin:0">
+            <button type="submit" class="btn primary" id="runBtn">Run SAR</button>
+            <span class="note" id="runStatus"></span>
+          </div>
         </form>
-        <p class="note" id="runHint"></p>
+        <p class="note" id="runHint" style="margin:10px 0 0"></p>
       </div>
     </section>
 
-    <section id="dist">
-      <p class="axis">03 · De distribution</p>
+    <section class="view" id="dash">
+      <p class="axis">03 · Dashboard</p>
       <h2>De distribution dashboard</h2>
-      <p class="note" id="distEmpty">Waiting for SAR. Set the integrals in 02 · Signal and run it to show this.</p>
+      <p class="note" id="distEmpty">Waiting for SAR. Set the integrals in 02 · Signal analysis and run it to show this.</p>
       <div id="distBody" hidden>
-        <div class="card selbar">
-          <button id="prevBtn" title="Previous (←)">Previous</button>
+        <div class="selbar">
+          <button class="btn" id="prevBtn" title="Previous (←)">Previous</button>
           <span class="big" id="selTitle"></span>
           <span id="selDetail"></span>
-          <button id="nextBtn" title="Next (→)">Next</button>
+          <button class="btn" id="nextBtn" title="Next (→)">Next</button>
           <span class="note">Click the table or map, or use the ← → keys</span>
         </div>
-        <div class="dash">
+        <div class="howto"></div>
+        <div class="dash" id="dplots">
           <div class="plotbox"><div id="dCurve" class="plot"></div></div>
           <div class="plotbox"><div id="dDR" class="plot"></div></div>
           <div class="plotbox"><div id="dHist" class="plot"></div></div>
-          <div class="plotbox"><div id="dRadial" class="plot"></div>
-            <p class="note">Only QC-passing De shown. Read a De by extending the line from the origin (left 0) through the point to the arc on the right. Inside the grey band (±2) a point equals the central value within its own error.</p></div>
+          <div class="plotbox"><div id="dRadial" class="plot"></div></div>
         </div>
+        <p class="note">Radial plot: only QC-passing De shown. Read a De by extending the line from the origin (left 0) through the point to the arc on the right. Inside the grey band (±2) a point equals the central value within its own error.</p>
         <div class="lower">
-          <div>
+          <div id="dmap">
             <div class="row"><b id="mapTitle"></b> <select id="mapDisc"></select></div>
             <div class="map" id="map"></div>
             <div class="legend"><span><i style="background:var(--pass)"></i>Pass</span><span><i style="background:var(--fail)"></i>Fail</span>
@@ -111,19 +148,20 @@ if ($meta === null || $inspect === null) {
             <p class="note" id="mapNote"></p>
           </div>
           <div>
-            <div class="row"><b>Results per analysis unit</b> <label class="note"><input type="checkbox" id="onlyPass"> Passing only</label>
+            <div class="row" id="dtable"><b>Results per analysis unit</b>
+              <label class="switch"><input type="checkbox" id="onlyPass"><span class="track"><span class="knob"></span></span>Passing only</label>
               <span class="note" id="tableCount"></span></div>
             <div class="tablewrap"><table id="units"></table></div>
             <p class="note" id="failedNote"></p>
-            <h3>QC of the selected unit</h3>
+            <h3 id="dqc">QC of the selected unit</h3>
             <div class="tablewrap"><table id="qc"></table></div>
           </div>
         </div>
       </div>
     </section>
 
-    <section id="model">
-      <p class="axis">04 · Model</p>
+    <section class="view" id="model">
+      <p class="axis">04 · Age model</p>
       <h2>Age model</h2>
       <div class="card" id="modelBox"><p class="note">Waiting for SAR.</p></div>
     </section>

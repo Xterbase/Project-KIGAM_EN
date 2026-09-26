@@ -52,18 +52,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// ---- Sample list (newest first). Folder names start with the time, so reverse name order = newest first.
-$samples = [];
-foreach (array_reverse(glob(SAMPLES . '/*', GLOB_ONLYDIR) ?: []) as $d) {
-    $id = basename($d);
-    $meta = read_json($d . '/meta.json');
-    if (sample_dir($id) !== null && $meta !== null) {
-        $samples[] = ['id' => $id] + $meta;
-    }
-}
+$samples = list_samples();
 ?>
 <!doctype html>
-<html lang="en">
+<html lang="ko">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -97,9 +89,7 @@ foreach (array_reverse(glob(SAMPLES . '/*', GLOB_ONLYDIR) ?: []) as $d) {
           <tr>
             <td class="num"><?= h(substr((string) ($s['uploaded_at'] ?? ''), 0, 16)) ?></td>
             <td><?= h($s['original_name'] ?? '') ?></td>
-            <td><?php if (($s['ok'] ?? true) === false): ?><span class="no">Read failed</span><?php
-                elseif (isset($s['single_grain'])): ?><?= $s['single_grain'] ? 'single-grain' : 'single-aliquot' ?><?php
-                else: ?>—<?php endif; ?></td>
+            <td><?= sample_mode($s) ?></td>
             <td class="num"><?= h($s['n_positions'] ?? '—') ?></td>
             <td class="num"><?= !empty($s['single_grain']) ? h($s['n_grains']) : '—' ?></td>
             <td><a class="bracket" href="dashboard.php?id=<?= h($s['id']) ?>">Open</a></td>

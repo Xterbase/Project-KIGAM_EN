@@ -39,6 +39,29 @@ function read_json(string $path): ?array
     return is_file($path) ? json_decode((string) file_get_contents($path), true) : null;
 }
 
+// Sample list (newest first). Folder names start with the time, so reverse name order = newest first. Shared by index.php and dashboard.php.
+function list_samples(): array
+{
+    $samples = [];
+    foreach (array_reverse(glob(SAMPLES . '/*', GLOB_ONLYDIR) ?: []) as $d) {
+        $id = basename($d);
+        $meta = read_json($d . '/meta.json');
+        if (sample_dir($id) !== null && $meta !== null) {
+            $samples[] = ['id' => $id] + $meta;
+        }
+    }
+    return $samples;
+}
+
+// Measurement-mode cell of the list table
+function sample_mode(array $s): string
+{
+    if (($s['ok'] ?? true) === false) {
+        return '<span class="no">Read failed</span>';
+    }
+    return isset($s['single_grain']) ? ($s['single_grain'] ? 'single-grain' : 'single-aliquot') : '—';
+}
+
 // Calls run.R. User input goes only through a JSON file; the only shell arguments are server-built paths.
 // File names differ per request, so concurrent requests do not overwrite each other's input/output.
 // With $keep_as the output is kept in the sample folder under that name (result record); otherwise it is deleted (display only).

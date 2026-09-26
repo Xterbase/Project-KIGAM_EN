@@ -194,11 +194,11 @@ R/05_models.R                    ⑤ De table → rule recommendation → CAM/MA
                                  ⑥ dose rate & age: not written (dose rate pending)
 R/run.R                          web entry point: JSON in → action → JSON out (the PHP ↔ R contract)
 R/selfcheck.R                    analysis-layer self-check (Rscript), including run.R round trips
-php/bridge.php                   run_r() (Rscript call), sample_dir() (id check) — shared by web/, outside DocumentRoot
+php/bridge.php                   run_r() (Rscript call), sample_dir() (id check), list_samples() — shared by web/, outside DocumentRoot
 web/index.php                    upload (BIN/RDA → outputs/samples/{id}/raw/) + inspect + sample list
-web/dashboard.php                one sample's dashboard shell; loads inspect.json, the rest via api.php
+web/dashboard.php                one sample's dashboard: tree nav, tabs Upload / Signal analysis / Dashboard / Age model (#hash); loads inspect.json, the rest via api.php
 web/api.php                      fetch → whitelisted action/args → run.R → JSON (sar/age_model results kept)
-web/assets/                      app.js (charts, SAR form), app.css (Operate-style tokens), vendor/plotly, fonts/ (Pretendard, OFL)
+web/assets/                      app.js (charts via plot(): zoom guide, magnifier, expand; SAR form), app.css (Operate-style tokens), vendor/plotly, fonts/ (Pretendard, OFL)
 version1_streamlit/              the ver.1.0 app, moved intact (imports are relative to it)
   utils/r_runner.py              the only crossing point into R (rpy2)   ← not carried into the web build
   utils/file_utils.py            sample_id + per-sample folder layout, CSV output
