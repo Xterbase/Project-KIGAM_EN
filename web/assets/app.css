@@ -109,7 +109,7 @@ button.primary { background: var(--moss); box-shadow: none; padding: 10px 20px; 
 button.primary:hover { background: #77b286; }
 button.primary:disabled { background: var(--moss); }
 
-input[type=text], select {
+input[type=text], input[type=number], select {
   background: var(--bone-white);
   border: 0;
   box-shadow: inset 0 0 0 0.5px var(--slate-smoke);
@@ -117,7 +117,12 @@ input[type=text], select {
   padding: 6px 8px;
 }
 input[type=text] { width: 96px; font-variant-numeric: tabular-nums; }
-input[type=text]:invalid { box-shadow: inset 0 0 0 1px var(--fail); }
+input[type=text]:invalid, input[type=number]:invalid { box-shadow: inset 0 0 0 1px var(--fail); }
+/* Integral input: a fixed ':' between two number fields. Spin buttons hidden (arrow keys still step). */
+.range { display: inline-flex; align-items: center; gap: 6px; }
+.range i { font-style: normal; color: var(--slate-smoke); }
+.range input { width: 58px; text-align: center; font-variant-numeric: tabular-nums; -moz-appearance: textfield; }
+.range input::-webkit-inner-spin-button, .range input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--deep-fern); outline-offset: 2px; }
 
 label { display: inline-flex; align-items: center; gap: 8px; }
@@ -160,6 +165,10 @@ tr.pick { cursor: pointer; }
 tr.pick:hover { background: var(--ash-gray); }
 tr.sel { background: #e6f1e8; }
 .ok { color: var(--pass); font-weight: 500; }
+/* Sample list: each cell has a top line (main info) + a bottom line (secondary info) */
+table.samples td { vertical-align: top; padding: 10px; }
+table.samples td .note { display: block; font-weight: 400; }
+table.samples td.memo { max-width: 220px; overflow: hidden; text-overflow: ellipsis; color: var(--slate-smoke); }
 .no { color: var(--fail); font-weight: 500; }
 
 /* Fact summary grid */
@@ -170,14 +179,13 @@ tr.sel { background: #e6f1e8; }
 /* ---------- Upload page ---------- */
 .page { max-width: 1280px; margin: 0 auto; padding: 48px 24px 64px; }
 .page .lead { color: var(--slate-smoke); margin: 8px 0 32px; }
-.upload { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
-.upload input[type=file] { font-size: 13px; }
+.page .drop { background: var(--bone-white); }
 
 /* ---------- Dashboard ---------- */
 .layout { display: grid; grid-template-columns: 290px 1fr; min-height: 100vh; padding: 28px 28px 28px 0; }
 
 /* Left tree menu. The selection is one white box (.pill) that slides between tabs; its right end joins the content panel so they read as one piece. */
-nav { position: relative; padding: 20px 0 0 24px; min-width: 0; }   /* min-width 0: on narrow screens the horizontal menu must not widen the column */
+nav { position: sticky; top: 28px; align-self: start; padding: 20px 0 0 24px; min-width: 0; }   /* min-width 0: on narrow screens the horizontal menu must not widen the column */
 nav .brand { font-size: 24px; font-weight: 500; padding-left: 6px; }
 nav .file { font-size: 12px; color: var(--slate-smoke); padding-left: 6px; margin-bottom: 40px; overflow-wrap: anywhere; }
 .tree { position: relative; list-style: none; margin: 0; padding: 0; }
@@ -218,6 +226,7 @@ li.on .sub li:nth-child(4) a { transition-delay: .15s; }
 .panel .card { background: var(--mist); box-shadow: none; border-radius: 16px; padding: 22px; }
 .panel .tablewrap { box-shadow: inset 0 0 0 1px var(--mist); border-radius: 14px; }
 .panel h2 { font-size: 24px; margin-bottom: 22px; }
+.panel .axis { font-size: 25px; }   /* Tab title ([ 03 · Dashboard ]) 1px larger than the h2 below it */
 .panel h3 { margin: 28px 0 12px; }
 .view { display: none; }
 .view.on { display: block; animation: view-in .45s var(--ease); }
@@ -293,7 +302,7 @@ li.on .sub li:nth-child(4) a { transition-delay: .15s; }
 }
 @media (max-width: 820px) {
   .layout { grid-template-columns: 1fr; padding: 12px; }
-  nav { padding: 0 0 12px; }
+  nav { position: relative; padding: 0 0 12px; }
   nav .file { margin-bottom: 12px; }
   .pill, .sub { display: none; }
   .tree { display: flex; gap: 4px; overflow-x: auto; }

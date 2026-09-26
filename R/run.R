@@ -53,6 +53,15 @@ suppressPackageStartupMessages({
     records <- data.frame(record_index = record_index, meta[, cols, drop = FALSE])
     names(records) <- tolower(names(records))
 
+    # File header info (sample name, user, measurement date, ...): shown in the sample list. All values if there are several.
+    # BIN DATE is a ddmmyy string. null if it cannot be read.
+    distinct <- function(col) {
+      v <- if (col %in% colnames(meta)) trimws(as.character(meta[[col]])) else character(0)
+      .arr(sort(setdiff(unique(v), c("", "None"))))
+    }
+    dates <- if ("DATE" %in% colnames(meta)) as.Date(as.character(meta$DATE), "%d%m%y") else NA
+    date_of <- function(f) if (all(is.na(dates))) NULL else format(f(dates, na.rm = TRUE))
+
     list(
       file = info$file,
       file_type = info$file_type,
@@ -63,6 +72,11 @@ suppressPackageStartupMessages({
       positions = .arr(info$positions),
       grains = data.frame(position = info$grain_position, grain = info$grain),
       record_types = .arr(info$record_types),
+      header = list(
+        sample = distinct("SAMPLE"), comment = distinct("COMMENT"), user = distinct("USER"),
+        sequence = distinct("SEQUENCE"), lightsource = distinct("LIGHTSOURCE"),
+        date_first = date_of(min), date_last = date_of(max)
+      ),
       records = records
     )
   },

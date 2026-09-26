@@ -24,7 +24,7 @@ const BASE = {
 const title = text => ({ text, font: { size: 14 }, x: 0, xanchor: 'left' });
 
 const SIGMAB = { single_grain: 0.20, single_aliquot: 0.15 };  // 0.20: literature-backed, 0.15: legacy default (unconfirmed)
-const MODE_LABEL = { single_grain: 'A · per grain', single_aliquot: 'B · per disc' };
+const MODE_LABEL = { single_grain: 'Single grain', single_aliquot: 'Single aliquot' };
 
 const fmt = (v, d = 1) => v == null ? '—' : Number(v).toFixed(d);
 const arr = v => v == null ? [] : [].concat(v);
@@ -230,15 +230,6 @@ document.querySelectorAll('.howto').forEach(h => h.innerHTML =
   `<span>${ICON.zout}${ICON.zin} zoom out / in around the centre</span>` +
   (h.nextElementSibling.classList.contains('dash') ? `<span>${ICON.exp} expand (the rest move to one column on the right · Esc to go back)</span>` : ''));
 
-// ---- 01 Upload: drop or choose another file to upload (index.php handles it)
-{
-  const drop = $('drop'), input = drop.querySelector('input'), form = $('upForm');
-  input.onchange = () => { if (input.files.length) { drop.querySelector('b').textContent = input.files[0].name + ' — uploading…'; form.submit(); } };
-  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
-  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
-  drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); input.files = e.dataTransfer.files; input.onchange(); });
-}
-
 // ---- Things available directly from the file layout
 const byDisc = {};
 I.grains.forEach(g => (byDisc[g.position] ??= []).push(g.grain));
@@ -342,15 +333,21 @@ async function showSignal() {
   } catch (e) { if (token === sigToken) plotMessage('curvePlot', 'Could not load the curve: ' + e.message); }
 }
 // Show the integrals being typed as coloured bands on the curve right away.
-function drawSignal() { if (sigCurve) drawCurve('curvePlot', sigCurve.c, sigCurve.text, parseRange($('sig').value), parseRange($('bg').value)); }
+// Integrals are entered as two numbers (start · end). R still receives the "start:end" string.
+const rangeVal = id => $(id + '1').value + ':' + $(id + '2').value;
+function drawSignal() { if (sigCurve) drawCurve('curvePlot', sigCurve.c, sigCurve.text, parseRange(rangeVal('sig')), parseRange(rangeVal('bg'))); }
 selPos.onchange = fillGrains; selGrain.onchange = fillRecs; selRec.onchange = showSignal;
-$('sig').oninput = drawSignal; $('bg').oninput = drawSignal;
+['sig1', 'sig2', 'bg1', 'bg2'].forEach((id, k, ids) => {
+  const inp = $(id); inp.max = NCH; inp.oninput = drawSignal;
+  // Typing ':' (or space) out of habit moves to the end field
+  if (k % 2 === 0) inp.onkeydown = e => { if (e.key === ':' || e.key === ' ') { e.preventDefault(); $(ids[k + 1]).focus(); } };
+});
 
 // ---- 02 Analysis settings: measurement mode + integrals → SAR → age model
 let formMode = SG ? 'single_grain' : 'single_aliquot';
 Object.entries(MODE_LABEL).forEach(([m, label]) => {
   const b = el('button', label); b.type = 'button'; b.dataset.mode = m;
-  if (m === 'single_grain' && !SG) { b.disabled = true; b.title = 'No GRAIN numbers in this file, so per-grain analysis is unavailable'; }
+  if (m === 'single_grain' && !SG) { b.disabled = true; b.title = 'No GRAIN numbers in this file, so Single grain analysis is unavailable'; }
   b.onclick = () => { formMode = m; syncSeg(); };
   $('modeSeg').append(b);
 });
@@ -359,14 +356,15 @@ function syncSeg() {
   const b = document.querySelector('#modeSeg button.on'), t = document.querySelector('#modeSeg .thumb');
   if (b && b.offsetWidth) { t.style.width = b.offsetWidth + 'px'; t.style.transform = `translateX(${b.offsetLeft - 3}px)`; }
 }
-$('runHint').textContent = `Channels 1–${NCH}, format start:end (e.g. 6:10). Typed values show as coloured bands on the curve above. `
-  + 'A gives one De per grain; B sums the grain signals of a disc and gives one De per disc.' + (SG ? '' : ' This file allows B only.');
+$('runHint').textContent = `Channels 1–${NCH}. Enter only the start and end channel numbers (e.g. 6 : 10). Typed values show as coloured bands on the curve above. `
+  + 'Single grain gives one De per grain; Single aliquot sums the grain signals of a disc and gives one De per disc.'
+  + (SG ? '' : ' This file allows Single aliquot only.');
 
 $('runForm').onsubmit = async e => {
   e.preventDefault();
-  const sig = $('sig').value.trim(), bg = $('bg').value.trim(), mode = formMode;
+  const sig = rangeVal('sig'), bg = rangeVal('bg'), mode = formMode;
   const bad = [parseRange(sig), parseRange(bg)].some(r => !r || r[0] < 1 || r[1] > NCH || r[0] > r[1]);
-  if (bad) { $('runStatus').textContent = `Integrals must be start:end within 1–${NCH}.`; return; }
+  if (bad) { $('runStatus').textContent = `Integrals must lie within 1–${NCH}, with start not greater than end.`; return; }
 
   $('runBtn').disabled = true;
   const t0 = Date.now(), tick = setInterval(() => { $('runStatus').textContent = `Running SAR · ${Math.round((Date.now() - t0) / 1000)} s`; }, 500);

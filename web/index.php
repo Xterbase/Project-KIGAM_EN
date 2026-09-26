@@ -44,6 +44,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'single_grain' => $x['single_grain'] ?? null,
                 'n_positions' => $x['n_positions'] ?? null,
                 'n_grains' => isset($x['grains']) ? count($x['grains']) : null,
+                'n_records' => isset($x['records']) ? count($x['records']) : null,
+                'record_types' => $x['record_types'] ?? null,
+                'header' => $x['header'] ?? null,
             ], JSON_UNESCAPED_UNICODE));
 
             header('Location: dashboard.php?id=' . $id);
@@ -72,32 +75,22 @@ $samples = list_samples();
     <div class="card error"><?= h($error) ?></div>
   <?php endif; ?>
 
-  <form class="card upload" method="post" enctype="multipart/form-data">
-    <input type="file" name="bin" accept=".bin,.BIN,.rda,.rdata,.RData" required>
-    <button type="submit" class="primary">Upload and open</button>
-    <span class="note">Reads the file layout right after upload (takes a few seconds)</span>
+  <!-- Drop zone (assets/drop.js): uploads as soon as a file is chosen, then opens the dashboard -->
+  <form method="post" enctype="multipart/form-data" id="upForm">
+    <label class="drop" id="drop">
+      <input type="file" name="bin" accept=".bin,.BIN,.rda,.rdata,.RData" hidden>
+      <b>Drop a BIN / RDA file here</b>
+      <span class="note">or click to choose · max <?= h(ini_get('upload_max_filesize')) ?> · after upload the file layout is read and the dashboard opens (a few seconds)</span>
+    </label>
   </form>
 
   <p class="axis" style="margin-top:48px">Samples</p>
   <?php if (!$samples): ?>
     <p class="note">No files uploaded yet.</p>
   <?php else: ?>
-    <div class="tablewrap">
-      <table>
-        <tr><th>Uploaded</th><th>File</th><th>Measurement mode</th><th>Discs</th><th>Grains</th><th></th></tr>
-        <?php foreach ($samples as $s): ?>
-          <tr>
-            <td class="num"><?= h(substr((string) ($s['uploaded_at'] ?? ''), 0, 16)) ?></td>
-            <td><?= h($s['original_name'] ?? '') ?></td>
-            <td><?= sample_mode($s) ?></td>
-            <td class="num"><?= h($s['n_positions'] ?? '—') ?></td>
-            <td class="num"><?= !empty($s['single_grain']) ? h($s['n_grains']) : '—' ?></td>
-            <td><a class="bracket" href="dashboard.php?id=<?= h($s['id']) ?>">Open</a></td>
-          </tr>
-        <?php endforeach; ?>
-      </table>
-    </div>
+    <?php sample_table($samples); ?>
   <?php endif; ?>
 </div>
+<script src="assets/drop.js"></script>
 </body>
 </html>
