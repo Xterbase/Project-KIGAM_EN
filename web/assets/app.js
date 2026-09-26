@@ -76,7 +76,7 @@ function renderContext() {
   const m = run ? run.meta : B.meta, box = $('context'); box.replaceChildren();
   [['Sample file', B.file], ['Measurement mode', run ? MODE_LABEL[run.mode] : 'not analysed'],
    ['Signal integral', run ? run.sig + ' (channels)' : '—'], ['Background integral', run ? run.bg + ' (channels)' : '—'],
-   ['sigmab', run ? SIGMAB[run.mode] : '—'], ['Unit', 'seconds (s) · no dose rate entered'],
+   ['sigmab', run ? SIGMAB[run.mode] : '—'], ['Run time', run ? run.secs + ' s' : '—'], ['Unit', 'seconds (s) · no dose rate entered'],
    ['Analysis package', `Luminescence ${m.luminescence_version} · R ${m.r_version}`]]
     .forEach(([k, v]) => { const s = el('span', k + ' '); s.append(el('b', v)); box.append(s); });
 }
@@ -99,17 +99,20 @@ function renderFile() {
 
 // ---- Shared: draw a curve (signal integral as a moss-green band, background as a grey band)
 function drawCurve(div, c, text, sig, bg) {
-  const x = c.x, dx = x.length > 1 ? (x[1] - x[0]) / 2 : 0.5, shapes = [];
-  const band = (r, color, name) => {
+  const x = c.x, dx = x.length > 1 ? (x[1] - x[0]) / 2 : 0.5, shapes = [], annotations = [];
+  // The top of the signal band is where the decay curve peaks, so a label there sits on the curve. Put the signal label just outside the band's right edge (where the curve has dropped).
+  const band = (r, color, name, outside) => {
     if (!r || r[0] < 1 || r[1] > x.length || r[0] > r[1]) return;
-    shapes.push({ type: 'rect', xref: 'x', yref: 'paper', x0: x[r[0] - 1] - dx, x1: x[r[1] - 1] + dx, y0: 0, y1: 1,
-      fillcolor: color, opacity: 0.3, line: { width: 0 }, label: { text: name, textposition: 'top center', font: { size: 11, color: C.ink } } });
+    const x0 = x[r[0] - 1] - dx, x1 = x[r[1] - 1] + dx, font = { size: 11, color: C.ink };
+    shapes.push({ type: 'rect', xref: 'x', yref: 'paper', x0, x1, y0: 0, y1: 1, fillcolor: color, opacity: 0.3, line: { width: 0 },
+      ...(outside ? {} : { label: { text: name, textposition: 'top center', font } }) });
+    if (outside) annotations.push({ xref: 'x', yref: 'paper', x: x1, y: 1, xanchor: 'left', yanchor: 'top', xshift: 4, text: name, showarrow: false, font });
   };
-  band(sig, C.moss, 'Signal'); band(bg, C.muted, 'Background');
+  band(sig, C.moss, 'Signal', true); band(bg, C.muted, 'Background');
   const tl = /^TL/.test(c.record_type);
   Plotly.react(div, [{ x, y: c.y, customdata: x.map((_, i) => i + 1), mode: 'lines', line: { color: C.ink, width: 1.5 },
     hovertemplate: `Channel %{customdata} · %{x:.2f} ${tl ? '°C' : 's'}<br>%{y} counts<extra></extra>` }],
-  { ...BASE, title: title(text), xaxis: ax({ title: tl ? 'Temperature (°C)' : 'Stimulation time (s)' }), yaxis: ax({ title: 'Counts' }), shapes, showlegend: false }, PC);
+  { ...BASE, title: title(text), xaxis: ax({ title: tl ? 'Temperature (°C)' : 'Stimulation time (s)' }), yaxis: ax({ title: 'Counts' }), shapes, annotations, showlegend: false }, PC);
 }
 
 // ---- 02 Signal: viewing record curves
@@ -167,8 +170,9 @@ $('runForm').onsubmit = async e => {
     try {
       age = { ok: true, ...(await api('age_model', { de: acc.map(u => u.de), de_error: acc.map(u => u.de_error), sigmab: SIGMAB[mode] })).result };
     } catch (err) { age = { ok: false, error: err.message }; }
-    run = { mode, sig, bg, sar: s.result, age, meta: s.meta };
-    $('runStatus').textContent = `Done · ${s.result.n_success}/${s.result.n_requested} analysed, ${acc.length} passed QC · ${Math.round((Date.now() - t0) / 1000)} s`;
+    // Run time: from the button press until the SAR + age-model responses arrive (includes R start-up on the server; the time the user waited)
+    run = { mode, sig, bg, sar: s.result, age, meta: s.meta, secs: ((Date.now() - t0) / 1000).toFixed(1) };
+    $('runStatus').textContent = `Done · ${s.result.n_success}/${s.result.n_requested} analysed, ${acc.length} passed QC · ${run.secs} s`;
     renderRun();
     location.hash = '#dist';
   } catch (err) {
